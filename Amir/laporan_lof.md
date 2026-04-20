@@ -22,12 +22,12 @@ Notebook ini mengimplementasikan **Local Outlier Factor (LOF)** sebagai salah sa
 
 ### Prinsip Kerja LOF
 
-LOF mengukur derajat anomali suatu titik data secara **relatif terhadap kerapatan lokal** tetangga-tetangganya:
+LOF, yang diperkenalkan oleh Breunig et al. (2000), mengukur derajat anomali suatu titik data secara **relatif terhadap kerapatan lokal** tetangga-tetangganya:
 
 1. **k-distance(p)**: Jarak dari titik p ke tetangga ke-k terdekatnya
 2. **Reachability Distance**: `reach-dist_k(p,o) = max(k-dist(o), d(p,o))`
-3. **Local Reachability Density (LRD)**: Kebalikan rata-rata reachability distance ke k-tetangga
-4. **LOF Score**: Rasio rata-rata LRD tetangga / LRD titik itu sendiri
+3. **Local Reachability Density (LRD)**: Kebalikan dari rata-rata *reachability distance* terhadap k-tetangga — semakin padat lingkungan, semakin tinggi LRD
+4. **LOF Score**: Rasio rata-rata LRD tetangga / LRD titik itu sendiri — mengukur seberapa jarang titik tersebut relatif terhadap lingkungannya
 
 - **LOF ~ 1** => Titik berada di area dengan kerapatan serupa => **Normal**
 - **LOF >> 1** => Titik berada di area jauh lebih jarang dari tetangganya => **Anomali**
@@ -153,12 +153,12 @@ LOF mengukur derajat anomali suatu titik data secara **relatif terhadap kerapata
 1. **Recall rendah pada mode konservatif** — mode `auto` hanya menghasilkan Recall 8.5%.
 2. **Bias terhadap negara struktural outlier** — petrostate dan ekonomi terbuka sering ditandai anomali karena profil strukturalnya, bukan karena krisis.
 3. **Tidak mendeteksi krisis global merata** — GFC hanya terdeteksi 22.4% karena semua negara terdampak bersamaan.
+4. **Sensitif terhadap dimensionalitas tinggi** — Goldstein & Uchida (2016) menunjukkan bahwa performa LOF cenderung menurun pada dataset berdimensi tinggi (> 10 fitur) karena jarak antar titik menjadi kurang diskriminatif (*curse of dimensionality*), relevan mengingat dataset ini memiliki 14 fitur.
 
 ### Rekomendasi:
 - LOF **tidak cukup kuat berdiri sendiri** sebagai satu-satunya EWS.
 - Perlu dikombinasikan dengan algoritma lain (Isolation Forest, Autoencoder, OCSVM, PCA, DBSCAN) melalui **Majority Voting** untuk meningkatkan reliabilitas deteksi.
 - Gunakan `contamination=0.1919` jika prioritas adalah coverage maksimal untuk EWS.
-
 ---
 
 ## 9. File Output
@@ -174,6 +174,14 @@ LOF mengukur derajat anomali suatu titik data secara **relatif terhadap kerapata
 - `lof_score` — Nilai LOF score (semakin tinggi = semakin anomali)
 - `predicted_anomaly` — Prediksi LOF (0=Normal, 1=Anomali)
 - `crisis_label` — Ground truth (0=Normal, 1=Krisis)
+
+---
+
+## Referensi
+
+1. Breunig, M. M., Kriegel, H. P., Ng, R. T., & Sander, J. (2000). LOF: Identifying Density-Based Local Outliers. *Proceedings of the 2000 ACM SIGMOD International Conference on Management of Data*, 93–104.
+2. Pedregosa, F., et al. (2011). Scikit-learn: Machine Learning in Python. *Journal of Machine Learning Research*, 12, 2825–2830.
+3. Goldstein, M., & Uchida, S. (2016). A Comparative Evaluation of Unsupervised Anomaly Detection Algorithms for Multivariate Data. *PLOS ONE*, 11(4).
 
 ---
 
