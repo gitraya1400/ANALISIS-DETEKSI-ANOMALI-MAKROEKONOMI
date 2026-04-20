@@ -12,7 +12,7 @@ Dalam upaya mitigasi dan pencegahan dampak krisis, pendekatan *Early Warning Sys
 
 Perkembangan pesat dalam bidang *data mining* dan *machine learning* membuka peluang baru untuk membangun EWS yang lebih adaptif dan robust. Salah satu pendekatan yang menjanjikan adalah penggunaan metode *unsupervised anomaly detection* — sebuah teknik yang mampu mengidentifikasi observasi yang menyimpang secara signifikan dari pola normal tanpa memerlukan label kelas eksplisit (Chandola, Banerjee, & Kumar, 2009). Pendekatan ini sangat relevan untuk deteksi krisis ekonomi karena: (1) peristiwa krisis bersifat langka dan tidak teratur, sehingga sulit memperoleh data berlabel untuk *supervised learning*; (2) krisis memiliki pola struktural (topologi) yang bervariasi antara negara berkembang dan negara maju yang seringkali tidak bisa ditangkap secara utuh oleh satu aliran algoritma matematis saja; dan (3) indikator ekonomi makro bersifat multidimensi dengan korelasi bernuansa multikolinearitas serta rentan akan efek penularan lintaskawasan (*contagion effect*) (Aggarwal, 2017).
 
-Penelitian ini memanfaatkan kekayaan data dari *World Bank Open Data* berlingkup global guna menangkal bias regional (misalnya hanya terfokus di Asia) dan memperkaya varians sampel terjadinya anomali (krisis historis di berbagai penjuru dunia). Analisis dilakukan terhadap 15 indikator makro pada 49 negara merentang di periode 1990–2024. Menilik kekosongan konsensus tunggal mengenai peta topologi multivariat sebuah krisis, EWS ini dibina atas fondasi komparasi enam algoritma *unsupervised* lintas-paradigma: *Isolation Forest* (Ensemble/Tree), *Local Outlier Factor* (Density), *Autoencoder* (Deep Learning), *One-Class SVM* (Kernel/Boundary), *PCA Reconstruction Error* (Linear Compression), dan *DBSCAN* (Spatial Clustering). Melalui komparasi ekstensif metodologi ini, probabilitas mitigasi *Early Warning System* akan terdongkrak menjadi jauh lebih inklusif.
+Penelitian ini memanfaatkan kekayaan data dari *World Bank Open Data* berlingkup global guna menangkal bias regional (misalnya hanya terfokus di Asia) dan memperkaya varians sampel terjadinya anomali (krisis historis di berbagai penjuru dunia). Analisis dilakukan terhadap 14 indikator makro pada 49 negara merentang di periode 1990–2024. Menilik kekosongan konsensus tunggal mengenai peta topologi multivariat sebuah krisis, EWS ini dibina atas fondasi komparasi enam algoritma *unsupervised* lintas-paradigma: *Isolation Forest* (Ensemble/Tree), *Local Outlier Factor* (Density), *Autoencoder* (Deep Learning), *One-Class SVM* (Kernel/Boundary), *PCA Reconstruction Error* (Linear Compression), dan *DBSCAN* (Spatial Clustering). Melalui komparasi ekstensif metodologi ini, probabilitas mitigasi *Early Warning System* akan terdongkrak menjadi jauh lebih inklusif.
 
 ### 1.2 Identifikasi Masalah
 
@@ -32,7 +32,7 @@ Berdasarkan latar belakang di atas, penelitian ini mengidentifikasi beberapa per
 
 Penelitian ini memiliki tujuan sebagai berikut:
 
-1. **Membangun pipeline deteksi anomali *unsupervised*** pada data indikator ekonomi makro multi-negara menggunakan data global dari *World Bank Open Data API*.
+1. **Membangun pipeline deteksi anomali *unsupervised*** pada data 14 indikator ekonomi makro multi-negara menggunakan data global dari *World Bank Open Data API*.
 
 2. **Mengimplementasikan dan membandingkan secara komprehensif enam algoritma deteksi anomali** dengan paradigma konseptual dasar yang sama sekali berbeda—*Isolation Forest*, *Local Outlier Factor* (LOF), *Autoencoder*, *One-Class SVM*, *PCA Reconstruction Error*, dan *DBSCAN*—dalam mengidentifikasi manifestasi riil krisis di ruang dimensi fitur.
 
@@ -87,7 +87,7 @@ Berbagai penelitian telah mengeksplorasi penerapan teknik *machine learning* unt
 
 Penelitian ini mengikuti pipeline *data mining* terstruktur yang terdiri dari tahapan berikut:
 
-1. **Akuisisi Data:** Pengambilan data 15 indikator ekonomi makro dari 49 negara (periode 1990–2024) melalui *World Bank API* menggunakan library `wbgapi`.
+1. **Akuisisi Data:** Pengambilan data 14 indikator ekonomi makro dari 49 negara (periode 1990–2024) melalui *World Bank API* menggunakan library `wbgapi`.
 
 2. **Preprocessing:** Penanganan *missing values* melalui interpolasi linear, filtering baris dengan data tidak lengkap, dan standardisasi fitur menggunakan *StandardScaler* untuk menormalisasi skala antar indikator.
 
@@ -109,25 +109,24 @@ Penelitian ini mengikuti pipeline *data mining* terstruktur yang terdiri dari ta
 Data diperoleh dari **World Bank Open Data** melalui API resmi menggunakan library Python `wbgapi`. Repositori ini menyediakan akses terbuka ke ratusan indikator pembangunan untuk lebih dari 200 negara, menjadikannya salah satu sumber data makroekonomi paling komprehensif dan terpercaya (World Bank, 2024).
 
 #### 3.1.2 Indikator yang Digunakan
-Sebanyak 15 indikator ekonomi makro yang sensitif terhadap tekanan dan ketidakseimbangan ekonomi dipilih sebagai fitur:
+Sebanyak 14 indikator ekonomi makro yang sensitif terhadap tekanan dan ketidakseimbangan ekonomi dipilih sebagai fitur:
 
 | No. | Kode World Bank | Nama Indikator | Deskripsi |
 |-----|----------------|----------------|-----------|
 | 1 | `NY.GDP.MKTP.KD.ZG` | GDP Growth | Pertumbuhan PDB riil (%) |
 | 2 | `NY.GDP.PCAP.KD.ZG` | GDP Per Capita Growth | Pertumbuhan PDB per kapita (%) |
 | 3 | `FP.CPI.TOTL.ZG` | Inflation CPI | Inflasi berdasarkan Indeks Harga Konsumen (%) |
-| 4 | `GC.DOD.TOTL.GD.ZS` | Govt Debt/GDP | Rasio utang pemerintah terhadap PDB (%) |
-| 5 | `FI.RES.TOTL.CD` | Total Reserves | Cadangan devisa total (USD) |
-| 6 | `SL.UEM.TOTL.ZS` | Unemployment | Tingkat pengangguran (%) |
-| 7 | `BN.CAB.XOKA.GD.ZS` | Current Account/GDP | Neraca transaksi berjalan terhadap PDB (%) |
-| 8 | `FM.LBL.BMNY.GD.ZS` | Broad Money/GDP | Jumlah uang beredar luas terhadap PDB (%) |
-| 9 | `NE.TRD.GNFS.ZS` | Trade/GDP | Rasio perdagangan terhadap PDB (%) |
-| 10 | `BX.KLT.DINV.WD.GD.ZS` | FDI Inflows/GDP | Arus masuk *Foreign Direct Investment* terhadap PDB (%) |
-| 11 | `FR.INR.RINR` | Real Interest Rate | Suku bunga riil (%) |
-| 12 | `NE.EXP.GNFS.ZS` | Exports/GDP | Rasio ekspor terhadap PDB (%) |
-| 13 | `NE.IMP.GNFS.ZS` | Imports/GDP | Rasio impor terhadap PDB (%) |
-| 14 | `DT.DOD.DECT.GN.ZS` | External Debt/GNI | Rasio utang luar negeri terhadap GNI (%) |
-| 15 | `NY.GNS.ICTR.ZS` | Gross Savings/GDP | Rasio tabungan bruto terhadap PDB (%) |
+| 4 | `FI.RES.TOTL.CD` | Total Reserves | Cadangan devisa total (USD) |
+| 5 | `SL.UEM.TOTL.ZS` | Unemployment | Tingkat pengangguran (%) |
+| 6 | `BN.CAB.XOKA.GD.ZS` | Current Account/GDP | Neraca transaksi berjalan terhadap PDB (%) |
+| 7 | `NE.TRD.GNFS.ZS` | Trade/GDP | Rasio perdagangan terhadap PDB (%) |
+| 8 | `BX.KLT.DINV.WD.GD.ZS` | FDI Inflows/GDP | Arus masuk *Foreign Direct Investment* terhadap PDB (%) |
+| 9 | `NE.EXP.GNFS.ZS` | Exports/GDP | Rasio ekspor terhadap PDB (%) |
+| 10 | `NE.IMP.GNFS.ZS` | Imports/GDP | Rasio impor terhadap PDB (%) |
+| 11 | `NY.GNS.ICTR.ZS` | Gross Savings/GDP | Rasio tabungan bruto terhadap PDB (%) |
+| 12 | `PA.NUS.FCRF` | Exchange Rate | Nilai tukar mata uang resmi terhadap USD (LCU per USD) |
+| 13 | `NV.IND.MANF.ZS` | Manufacturing Value Added/GDP | Kontribusi sektor manufaktur terhadap PDB (%) |
+| 14 | `NE.GDI.TOTL.ZS` | Investment/GDP (Gross Capital Formation) | Rasio investasi bruto (pembentukan modal tetap) terhadap PDB (%) |
 
 #### 3.1.3 Cakupan Negara
 Sebanyak 49 negara dari 8 kawasan ekonomi utama dijadikan sampel:
@@ -141,7 +140,7 @@ Sebanyak 49 negara dari 8 kawasan ekonomi utama dijadikan sampel:
 - **Oseania:** AUS, NZL
 
 #### 3.1.4 Periode Analisis
-Periode observasi mencakup tahun **1990–2024** (35 tahun), menghasilkan dataset dengan 1.715 baris (sebelum preprocessing) dan 17 kolom (15 indikator + 2 metadata: kode negara dan tahun). Setelah preprocessing (penanganan *missing values* dan filtering), dataset akhir terdiri dari **1.190 observasi** dengan **13 fitur** yang valid.
+Periode observasi mencakup tahun **1990–2024** (35 tahun), menghasilkan dataset dengan 1.714 baris dan 17 kolom (14 indikator + 2 metadata: kode negara dan tahun + 1 kolom `crisis_label`). Data telah melalui tahap preprocessing berupa penanganan *missing values*, filtering, dan standardisasi *z-score*, sehingga seluruh nilai fitur dalam dataset akhir telah dinormalisasi dan siap digunakan langsung untuk pemodelan deteksi anomali.
 
 ### 3.2 Metode
 
