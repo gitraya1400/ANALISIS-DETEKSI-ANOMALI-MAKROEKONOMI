@@ -1,0 +1,2 @@
+model,eps,min_samples,n_clusters,n_anomalies,pct_anomalies,precision,recall,f1_score,TN,FP,FN,TP
+DBSCAN,1.5,10,7,292,17.04,0.339,0.3009,0.3188,1192,193,230,99

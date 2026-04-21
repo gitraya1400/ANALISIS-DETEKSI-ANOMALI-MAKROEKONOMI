@@ -12,7 +12,7 @@ Notebook ini mengimplementasikan **DBSCAN** (Density-Based Spatial Clustering of
 
 **Metodologi:**
 - Prinsip: Spatial clustering berbasis density — titik noise (−1) = anomali
-- Grid Search: 8 variasi `eps` × 5 variasi `min_samples` = 40 kombinasi
+- Grid Search: 8 variasi `eps` × 5 variasi `min_samples` = 40 kombinasi (26 valid)
 - Evaluasi: Precision, Recall, F1-Score terhadap *ground truth* krisis historis
 - Interpretasi: Analisis cluster, feature importance, dan deteksi per krisis
 
@@ -62,7 +62,6 @@ DBSCAN, yang diperkenalkan oleh Ester et al. (1996), mengelompokkan titik-titik 
 |-----|-------|-----------|
 | 1 | GDP_Growth | Pertumbuhan PDB riil (%) |
 | 2 | GDP_PerCapita_Growth | Pertumbuhan PDB per kapita (%) |
-| 3 | GDP_PerCapita_Growth | Pertumbuhan PDB per kapita (%) |
 | 3 | Inflation_CPI | Inflasi berdasarkan CPI (%) |
 | 4 | Total_Reserves | Cadangan devisa total |
 | 5 | Unemployment | Tingkat pengangguran (%) |
@@ -98,7 +97,7 @@ Sebelum melakukan grid search, dilakukan analisis **K-distance plot** untuk mend
 | **eps** | 1.5, 2.0, 2.5, 3.0, 3.5, 4.0, 4.5, 5.0 |
 | **min_samples** | 3, 5, 7, 10, 15 |
 | **Metric** | Euclidean |
-| **Total kombinasi** | 40, menghasilkan 27 kombinasi valid |
+| **Total kombinasi** | 40, menghasilkan 26 kombinasi valid |
 | **Kriteria seleksi** | F1-Score tertinggi terhadap ground truth |
 
 ### 4.4 Top 5 Hasil Grid Search
@@ -146,8 +145,15 @@ Sebelum melakukan grid search, dilakukan analisis **K-distance plot** untuk mend
 | Cluster | Jumlah Observasi | Persentase |
 |---------|-----------------|------------|
 | **Noise (−1) / Anomali** | 292 | 17.0% |
-| **Cluster 0** (cluster utama) | ~1.200+ | ~70%+ |
-| **Cluster 1–6** (cluster minor) | bervariasi | bervariasi |
+| **Cluster 0** (cluster utama) | 1.343 | 78.4% |
+| **Cluster 1** | 17 | 1.0% |
+| **Cluster 2** | 12 | 0.7% |
+| **Cluster 3** | 14 | 0.8% |
+| **Cluster 4** | 10 | 0.6% |
+| **Cluster 5** | 14 | 0.8% |
+| **Cluster 6** | 12 | 0.7% |
+
+> **Catatan:** Cluster 0 mendominasi data (78.4%), merepresentasikan kondisi ekonomi "normal". Enam cluster minor (total 79 observasi / 4.6%) menangkap kelompok-kelompok ekonomi dengan karakteristik spesifik yang tetap terstruktur (bukan noise). Sisa 17.0% dianggap noise/anomali.
 
 ---
 
@@ -155,23 +161,71 @@ Sebelum melakukan grid search, dilakukan analisis **K-distance plot** untuk mend
 
 | Krisis | Tahun | Observasi | Terdeteksi | Detection Rate |
 |--------|-------|-----------|------------|----------------|
-| **Krisis Asia** | 1997–1998 | 14 | — | —% |
-| **Krisis Rusia** | 1998 | 1 | — | —% |
-| **Krisis Argentina** | 2001–2002 | 2 | — | —% |
-| **Global Financial Crisis** | 2008–2009 | 98 | — | —% |
-| **Krisis Utang Eropa** | 2010–2012 | 15 | — | —% |
-| **Pandemi COVID-19** | 2020 | 49 | — | —% |
+| **Krisis Asia** | 1997–1998 | 10 | 6 | **60.0%** |
+| **Krisis Rusia** | 1998 | 1 | 0 | 0.0% |
+| **Krisis Argentina** | 2001–2002 | 2 | 2 | **100.0%** |
+| **Global Financial Crisis** | 2008–2009 | 98 | 27 | **27.6%** |
+| **Krisis Utang Eropa** | 2010–2012 | 15 | 7 | **46.7%** |
+| **Pandemi COVID-19** | 2020 | 49 | 26 | **53.1%** |
 
-> **Catatan:** Nilai detection rate per krisis akan terisi setelah notebook `dbscan.ipynb` dijalankan secara penuh (bagian Analisis per Krisis Historis, Section 11). Tanda "—" akan digantikan dengan angka aktual dari hasil eksperimen.
-
-### Interpretasi Umum:
-- **Krisis regional** (Asia 1997, Argentina 2001) cenderung lebih mudah dideteksi oleh DBSCAN karena negara-negara terdampak menunjukkan pola indikator yang sangat berbeda dari cluster utama.
-- **Krisis global** (GFC 2008, COVID-19 2020) lebih sulit dideteksi karena dampaknya menyebar merata ke banyak negara, sehingga titik-titik tetap berada dalam formasi cluster besar.
-- DBSCAN paling efektif mendeteksi anomali yang secara spasial **terisolasi** dari formasi cluster utama dalam ruang fitur 14 dimensi.
+### Interpretasi:
+- **Krisis Argentina** mendapat detection rate tertinggi (**100%**) — kedua observasi (2001, 2002) terdeteksi sebagai noise. Hal ini karena krisis Argentina bersifat sangat mendalam dan terisolasi, menciptakan titik data yang sangat jauh dari cluster utama.
+- **Krisis Asia** terdeteksi 60% — IDN (1998), KOR (1998), MYS (1997-1998), dan THA (1997-1998) berhasil diidentifikasi. Negara-negara ini menunjukkan guncangan simultan pada multiple indikator.
+- **COVID-19** terdeteksi 53.1% (26 dari 49 negara) — detection rate tertinggi untuk krisis global. Guncangan eksogen pandemi menciptakan pola indikator yang ekstrem.
+- **GFC** terdeteksi 27.6% — meskipun berdampak global, hanya negara-negara yang terkena sangat parah (seperti IRL, SGP, HUN) yang profil indikatornya cukup menyimpang untuk diklasifikasikan sebagai noise.
+- **Krisis Utang Eropa** terdeteksi 46.7% — GRC (2010-2012), IRL (2010-2012), dan PRT (2012) teridentifikasi.
+- **Krisis Rusia** tidak terdeteksi (0%) — hanya satu observasi, dan Rusia pada 1998 mungkin tidak cukup terisolasi dalam ruang fitur 14 dimensi.
 
 ---
 
-## 7. Analisis & Interpretasi
+## 7. Top 10 Negara dengan Anomali Terbanyak
+
+| No. | Negara | Kode | Jumlah Anomali |
+|-----|--------|------|----------------|
+| 1 | Singapura | SGP | 35 |
+| 2 | Irlandia | IRL | 32 |
+| 3 | Vietnam | VNM | 23 |
+| 4 | Malaysia | MYS | 20 |
+| 5 | Belanda | NLD | 18 |
+| 6 | Arab Saudi | SAU | 17 |
+| 7 | Hongaria | HUN | 17 |
+| 8 | Swiss | CHE | 13 |
+| 9 | Rumania | ROU | 11 |
+| 10 | Rusia | RUS | 9 |
+
+> **Catatan:** Negara-negara dengan ekonomi sangat terbuka (rasio Trade/GDP, Exports/GDP tinggi) seperti SGP, IRL, NLD, dan MYS mendominasi daftar ini. DBSCAN menandai mereka karena profil indikator mereka secara spasial berada jauh dari cluster utama yang didominasi oleh ekonomi berukuran menengah hingga besar dengan keterbukaan moderat.
+
+---
+
+## 8. Feature Importance
+
+Analisis feature importance berdasarkan **perbedaan rata-rata absolut** antara observasi anomali (noise) dan normal (cluster member):
+
+| Rank | Fitur | |Mean Diff| | Mean Normal | Mean Anomali |
+|------|-------|-----------:|------------:|-------------:|
+| 1 | Exports_GDP | **1.3179** | −0.2272 | 1.0907 |
+| 2 | Trade_GDP | **1.3066** | −0.2252 | 1.0814 |
+| 3 | Imports_GDP | **1.2771** | −0.2200 | 1.0571 |
+| 4 | FDI_Inflows_GDP | 0.8012 | −0.1412 | 0.6600 |
+| 5 | Gross_Savings_GDP | 0.6584 | −0.1123 | 0.5461 |
+| 6 | Current_Account_GDP | 0.6562 | −0.1112 | 0.5450 |
+| 7 | Manufacturing_Value | 0.4245 | −0.0735 | 0.3510 |
+| 8 | Exchange_Rate | 0.2802 | −0.0500 | 0.2302 |
+| 9 | GDP_PerCapita_Growth | 0.2670 | 0.0440 | −0.2229 |
+| 10 | Investment_GDP | 0.2529 | −0.0450 | 0.2079 |
+| 11 | GDP_Growth | 0.1742 | 0.0277 | −0.1465 |
+| 12 | Unemployment | 0.1393 | 0.0201 | −0.1192 |
+| 13 | Inflation_CPI | 0.1390 | −0.0582 | 0.0808 |
+| 14 | Total_Reserves | 0.0629 | −0.0140 | 0.0489 |
+
+### Interpretasi Feature Importance:
+- **Trade-related indicators** (Exports/GDP, Trade/GDP, Imports/GDP) merupakan tiga fitur terpenting, mengkonfirmasi bahwa DBSCAN menangkap pola anomali pada negara-negara dengan keterbukaan ekonomi ekstrem.
+- **FDI dan Savings** juga berperan signifikan — anomali cenderung memiliki nilai FDI dan tabungan bruto yang lebih tinggi dari rata-rata.
+- **GDP Growth dan Unemployment** memiliki perbedaan yang relatif kecil, menunjukkan bahwa DBSCAN lebih sensitif terhadap indikator struktural (trade, FDI) daripada indikator siklus ekonomi (growth, unemployment).
+
+---
+
+## 9. Analisis & Interpretasi
 
 ### Kekuatan DBSCAN:
 1. **Deteksi anomali native** — noise point secara natural merepresentasikan observasi yang tidak cocok dengan pola mayoritas, tanpa perlu menentukan threshold atau contamination rate.
@@ -205,12 +259,16 @@ Sebelum melakukan grid search, dilakukan analisis **K-distance plot** untuk mend
 
 ---
 
-## 8. File Output
+## 10. File Output
 
 | File | Deskripsi |
 |------|-----------|
 | `dbscan.ipynb` | Notebook lengkap dengan kode dan visualisasi |
-| `grid_search_dbscan.csv` | Hasil grid search 27 kombinasi parameter |
+| `grid_search_dbscan.csv` | Hasil grid search 26 kombinasi parameter |
+| `deteksi_per_krisis_dbscan.csv` | Detection rate per krisis historis |
+| `top_negara_anomali_dbscan.csv` | Top 10 negara dengan anomali terbanyak |
+| `feature_importance_dbscan.csv` | Feature importance (mean difference) |
+| `distribusi_cluster_dbscan.csv` | Distribusi cluster DBSCAN |
 | `hasil_dbscan.csv` | Dataset hasil deteksi (1.714 baris) |
 | `ringkasan_model_dbscan.csv` | Ringkasan metrik model terbaik |
 | `laporan_dbscan.md` | Laporan singkat ini |
