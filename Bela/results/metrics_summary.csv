@@ -1,2 +1,0 @@
-AUC-ROC,F1-Score,Precision,Recall,Average Precision,k_components,ucl_spe,ucl_t2,true_positive,false_positive,false_negative,true_negative
-0.6414335664335665,0.3983739837398374,0.6049382716049383,0.296969696969697,0.5785259392457878,9,2.4257787654243272,17.14826805842997,49,32,116,176
