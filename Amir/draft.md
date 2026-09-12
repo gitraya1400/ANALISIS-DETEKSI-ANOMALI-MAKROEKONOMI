@@ -6,6 +6,12 @@
 
 ---
 
+## Ringkasan Eksekutif
+
+Laporan ini menerapkan Local Outlier Factor (LOF) untuk mendeteksi anomali pada 14 indikator makroekonomi dari 49 negara (1990–2024), sebagai satu dari enam algoritma *unsupervised* dalam proyek EWS krisis ekonomi kelompok. Berbeda dari skema grid search berbasis label krisis yang umum dipakai, penelitian ini memilih `n_neighbors` secara sepenuhnya label-free: dihitung pada rentang `{5, 10, 15, 20, 30, 50}` dan diagregasi lewat nilai maksimum (Breunig et al., 2000), dengan ambang batas anomali memakai aturan tetap `contamination='auto'` (1,5), bukan diturunkan dari rasio krisis aktual. Terhadap *ground truth* eksternal (229 observasi krisis dari 1.715 baris, bersumber dari basis data krisis bergaya IMF/Laeven-Valencia), LOF mencapai ROC-AUC 0,7099 dan F1-Score 0,2100, dengan *robustness check* 20 kali *resampling* menunjukkan hasil yang stabil (ROC-AUC 0,7068 ± 0,0106). LOF terbukti unggul mendeteksi krisis regional/idiosinkratik (Argentina, Brasil) namun lemah pada krisis global yang berdampak merata (*Global Financial Crisis*), konsisten dengan prinsip kerjanya yang menilai keanomalian secara relatif terhadap kerapatan tetangga lokal. Hasil ini diposisikan sebagai satu kontribusi input bagi mekanisme *Majority Voting* tingkat proyek kelompok.
+
+---
+
 ## 1. Pendahuluan
 
 ### 1.1 Latar Belakang
@@ -230,18 +236,6 @@ Panel kanan memisahkan dua pola berbeda yang tersembunyi di balik tabel top 10. 
 
 Panel atas menunjukkan lonjakan tajam ke hampir 4,9 pada tahun 1990, satu-satunya titik yang jauh di luar kisaran normal 1,1 sampai 1,3 di tahun-tahun lain; ini didorong oleh skor ekstrem Peru yang dibahas di §4.4, bukan pola tahun 1990 secara umum. Panel bawah memperlihatkan bahwa persentase deteksi dan persentase ground truth tidak selalu bergerak searah: pada periode 2008 sampai 2012 (mencakup GFC dan Krisis Utang Eropa), persentase ground truth krisis cukup tinggi tapi persentase deteksi tetap rendah, mengonfirmasi lagi kelemahan LOF pada krisis yang berlangsung lama dan berdampak merata. Sebaliknya di tahun 1990 dan 1999, persentase deteksi melampaui persentase ground truth, konsisten dengan temuan bahwa sebagian anomali yang ditandai di tahun-tahun itu (hiperinflasi Peru, peluncuran Euro) bukan krisis menurut ground truth.
 
-**Kekuatan:**
-1. Deteksi anomali kontekstual/lokal: mampu mengidentifikasi negara/tahun yang anomali dalam konteks *peer group* regionalnya, bukan hanya outlier global.
-2. Pemilihan hyperparameter dan ambang batas sepenuhnya tidak bergantung pada label krisis, hanya bergantung pada rentang k dan interpretasi skor LOF dari literatur.
-3. Robustness check membuktikan hasil stabil (ROC-AUC 0,7068 ± 0,0106 antar 20 subsample), bukan artefak satu kali *fit*.
-4. Mampu menangkap *structural break* ekonomi riil yang tidak selalu terdaftar sebagai "krisis" pada ground truth, misalnya lonjakan anomali serentak pada negara-negara pendiri Eurozone tahun 1999.
-
-**Keterbatasan:**
-1. Tidak mendeteksi krisis global merata secara baik: GFC hanya terdeteksi 6,4% karena seluruh negara terdampak hampir bersamaan, sehingga kerapatan lokal relatif tidak berubah signifikan.
-2. Bias terhadap negara dengan profil struktural ekstrem: negara petrostate (Arab Saudi, 14 dari 14 anomali adalah *false positive*) dan ekonomi sangat terbuka sering ditandai anomali karena karakteristik strukturalnya yang memang berbeda dari mayoritas, bukan semata-mata karena sedang mengalami krisis.
-3. Cakupan *ground truth* tidak mencakup seluruh bentuk anomali ekonomi riil: episode hiperinflasi murni (mis. Peru 1990) tidak masuk definisi krisis pada `ground_truth_imf.csv`, sehingga terhitung sebagai *false positive* meski secara ekonomi merupakan anomali yang sah.
-4. Sensitif terhadap dimensionalitas tinggi: sejalan dengan temuan Goldstein & Uchida (2016), performa LOF berpotensi menurun pada dataset dengan lebih dari 10 fitur akibat *curse of dimensionality*, relevan mengingat dataset ini memiliki 14 fitur.
-
 **Visualisasi Ruang Fitur.** Karena data punya 14 dimensi, dua teknik reduksi dimensi dipakai untuk melihat sebaran krisis dan prediksi LOF secara visual.
 
 ![Proyeksi PCA: ground truth vs prediksi LOF](../extracted_images/Amir_img_9.png)
@@ -263,6 +257,20 @@ t-SNE (non-linear) memisahkan data menjadi klaster-klaster yang lebih jelas diba
 *Gambar 4.12. Proyeksi t-SNE yang sama, diwarnai berdasarkan nilai `anomaly_score`.*
 
 Titik dengan skor tinggi tersebar di banyak klaster berbeda, bukan terkonsentrasi di satu klaster saja. Ini konsisten dengan sifat LOF yang menilai keanomalian relatif terhadap tetangga lokal masing-masing klaster, bukan terhadap satu definisi "anomali" yang berlaku sama untuk seluruh data.
+
+**Kekuatan:**
+1. Deteksi anomali kontekstual/lokal: mampu mengidentifikasi negara/tahun yang anomali dalam konteks *peer group* regionalnya, bukan hanya outlier global.
+2. Pemilihan hyperparameter dan ambang batas sepenuhnya tidak bergantung pada label krisis, hanya bergantung pada rentang k dan interpretasi skor LOF dari literatur.
+3. Robustness check membuktikan hasil stabil (ROC-AUC 0,7068 ± 0,0106 antar 20 subsample), bukan artefak satu kali *fit*.
+4. Mampu menangkap *structural break* ekonomi riil yang tidak selalu terdaftar sebagai "krisis" pada ground truth, misalnya lonjakan anomali serentak pada negara-negara pendiri Eurozone tahun 1999.
+
+**Keterbatasan:**
+1. Tidak mendeteksi krisis global merata secara baik: GFC hanya terdeteksi 6,4% karena seluruh negara terdampak hampir bersamaan, sehingga kerapatan lokal relatif tidak berubah signifikan.
+2. Bias terhadap negara dengan profil struktural ekstrem: negara petrostate (Arab Saudi, 14 dari 14 anomali adalah *false positive*) dan ekonomi sangat terbuka sering ditandai anomali karena karakteristik strukturalnya yang memang berbeda dari mayoritas, bukan semata-mata karena sedang mengalami krisis.
+3. Cakupan *ground truth* tidak mencakup seluruh bentuk anomali ekonomi riil: episode hiperinflasi murni (mis. Peru 1990) tidak masuk definisi krisis pada `ground_truth_imf.csv`, sehingga terhitung sebagai *false positive* meski secara ekonomi merupakan anomali yang sah.
+4. Sensitif terhadap dimensionalitas tinggi: sejalan dengan temuan Goldstein & Uchida (2016), performa LOF berpotensi menurun pada dataset dengan lebih dari 10 fitur akibat *curse of dimensionality*, relevan mengingat dataset ini memiliki 14 fitur.
+5. Kompleksitas komputasi LOF sebesar O(n²) tidak diukur secara terpisah pada penelitian ini (mis. waktu proses per nilai k, atau perbandingan waktu proses dengan lima algoritma lain); pada 1.715 baris data waktu proses tidak jadi kendala praktis, tapi ini perlu diperhitungkan bila metode ini diterapkan pada panel data yang jauh lebih besar.
+6. Evaluasi *contextual anomaly* secara eksplisit per kelompok kawasan (mis. menormalkan skor LOF terhadap *peer group* regional seperti ASEAN atau Eropa) belum dilakukan sebagai analisis terpisah; interpretasi kontekstual pada laporan ini (§4.4) didasarkan pada pengamatan kualitatif terhadap negara per negara, bukan pengujian formal per kawasan.
 
 ---
 
@@ -288,7 +296,7 @@ LOF terbukti efektif menangkap anomali kontekstual/regional dan idiosinkratik, d
 10. Pedregosa, F., et al. (2011). Scikit-learn: Machine Learning in Python. *Journal of Machine Learning Research*, 12, 2825–2830.
 11. Reinhart, C. M., & Rogoff, K. S. (2009). *This Time Is Different: Eight Centuries of Financial Folly*. Princeton University Press.
 12. Sugidamayatno, S., & Lelono, D. (2019). Outlier Detection Credit Card Transactions Using Local Outlier Factor Algorithm (LOF). *IJCCS (Indonesian Journal of Computing and Cybernetics Systems)*, 13(4), 409–420. https://doi.org/10.22146/ijccs.46561
-13. World Bank. Global Economic Monitor. https://data.worldbank.org/
+13. World Bank. (2024). *Global Economic Monitor*. https://data.worldbank.org/
 
 ---
 
