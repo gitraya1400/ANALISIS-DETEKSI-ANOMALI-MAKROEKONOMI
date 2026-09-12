@@ -1,0 +1,59 @@
+Shape data: (1714, 17)
+Distribusi crisis_label:
+crisis_label
+0    0.808051
+1    0.191949
+Name: proportion, dtype: float64
+
+Jumlah fitur dipakai: 14 -> ['GDP_Growth', 'GDP_PerCapita_Growth', 'Inflation_CPI', 'Total_Reserves', 'Unemployment', 'Current_Account_GDP', 'Trade_GDP', 'FDI_Inflows_GDP', 'Exports_GDP', 'Imports_GDP', 'Gross_Savings_GDP', 'Exchange_Rate', 'Manufacturing_Value', 'Investment_GDP']
+
+Train (normal only): (969, 17)
+Validation (normal+anomali): (372, 17)
+Test (normal+anomali): (373, 17)
+
+Jumlah komponen terpilih (k) untuk >=95% explained variance: 9 dari 14
+
+PCA final dilatih dengan k=9 komponen
+Total explained variance: 0.9544
+
+UCL SPE (95%): 2.4258
+UCL T^2 (95%): 17.1483
+
+=== METRIK EVALUASI (Test Set) ===
+AUC-ROC             : 0.6414
+F1-Score            : 0.3984
+Precision           : 0.6049
+Recall              : 0.2970
+Average Precision   : 0.5785
+
+=== CONFUSION MATRIX (Test Set) ===
+True Positive  (anomali & memang krisis)      : 49
+False Positive (anomali tapi TIDAK krisis)     : 32
+False Negative (TIDAK anomali tapi krisis)     : 116
+True Negative  (tidak anomali & memang normal) : 176
+
+Observasi anomaly_score tertinggi: BRA tahun 1990
+Top 5 variabel penyumbang:
+GDP_Growth              2.010000
+GDP_PerCapita_Growth    1.637192
+Gross_Savings_GDP       1.606996
+Total_Reserves          0.442374
+Current_Account_GDP     0.151497
+dtype: float64
+
+=== EFFECT SIZE (Anomali vs Normal, Test Set) ===
+Gross_Savings_GDP       0.582309
+Exports_GDP             0.507605
+Trade_GDP               0.488501
+Imports_GDP             0.460579
+GDP_PerCapita_Growth   -0.444912
+Manufacturing_Value     0.421137
+GDP_Growth             -0.377325
+Exchange_Rate           0.346939
+Investment_GDP          0.335821
+Total_Reserves          0.321183
+Current_Account_GDP     0.296553
+Inflation_CPI           0.283300
+Unemployment            0.223509
+FDI_Inflows_GDP         0.057137
+dtype: float64
