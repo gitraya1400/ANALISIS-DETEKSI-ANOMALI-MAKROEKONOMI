@@ -1,0 +1,5 @@
+jenis_krisis,n_krisis,TP,FP,FN,precision,recall,f1,avg_precision
+Banking Crisis,158,37,152,121,0.1958,0.2342,0.2133,0.1193
+Currency Crisis,35,19,170,16,0.1005,0.5429,0.1696,0.0639
+Sovereign Debt,16,7,182,9,0.037,0.4375,0.0683,0.0183
+COVID-19 (2020),49,31,158,18,0.164,0.6327,0.2605,0.191

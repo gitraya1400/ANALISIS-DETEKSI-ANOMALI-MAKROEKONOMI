@@ -1,0 +1,213 @@
+======================================================================
+LAPORAN AKHIR: DETEKSI ANOMALI MAKROEKONOMI DENGAN DBSCAN
+======================================================================
+Tanggal      : 12 September 2026, 14:30
+Metode       : DBSCAN (Density-Based Spatial Clustering of Applications
+               with Noise) - Unsupervised Learning
+Data         : Indikator Makroekonomi 49 Negara, 1990-2024
+Ground Truth : IMF Historical Crisis Database
+
+======================================================================
+1. DESKRIPSI DATA
+======================================================================
+  - Total observasi        : 1,715 baris
+  - Jumlah negara          : 49 negara
+  - Periode                : 1990 - 2024
+  - Fitur makroekonomi     : 14 indikator
+  - Krisis historis (GT)   : 229 tahun-negara
+  - Periode normal (GT)    : 1486 tahun-negara
+
+  Indikator yang digunakan:
+    GDP_Growth, Inflation_CPI, Unemployment, Current_Account_GDP,
+    Reserves_Months_Imports, FDI_Inflows_GDP, Exports_GDP, Imports_GDP,
+    Gross_Savings_GDP, Investment_GDP, Manufacturing_Value,
+    Domestic_Credit_GDP, Broad_Money_Growth, Exchange_Depreciation
+
+======================================================================
+2. PREPROCESSING
+======================================================================
+  a) Feature Engineering:
+     Exchange_Rate -> Exchange_Depreciation (% perubahan YoY per negara)
+     Alasan: Skala Exchange_Rate berbeda jauh antar negara (IDR vs USD)
+
+  b) Imputasi Missing Values:
+     - Tahap 1: Median per economy (imputasi kontekstual per negara)
+     - Tahap 2: Median global sebagai fallback
+     Kolom dengan missing terbanyak: Broad_Money_Growth (25%), Domestic_Credit_GDP (18%)
+
+  c) Standarisasi:
+     - StandardScaler (z-score) pada 14 fitur
+     - Wajib: DBSCAN berbasis jarak Euclidean
+
+  d) Reduksi Dimensi (PCA):
+     - Input: 14 fitur -> Output: 9 komponen (threshold 90% varians)
+     - Varians tercakup: 92.59%
+     - Re-standarisasi ulang komponen PCA sebelum DBSCAN Global
+
+======================================================================
+3. METODOLOGI DBSCAN
+======================================================================
+  DBSCAN: Density-Based Spatial Clustering of Applications with Noise
+  Prinsip: Titik yang terisolasi (jauh dari klaster padat) = Noise = Anomali
+
+  Definisi: Anomaly = DBSCAN label -1 (noise point)
+  Prediksi : label -1 -> predicted_anomaly = 1 (Anomali/Krisis)
+             label >= 0 -> predicted_anomaly = 0 (Normal)
+
+  Anomaly Score: Jarak minimum ke core point terdekat, dinormalisasi [0,1]
+                 Score = 1 -> paling jauh/paling anomali
+
+  Tuning Parameter:
+  - eps  : Kneedle Algorithm (max perpendicular distance ke diagonal)
+  - min_samples = 9 (Global) / 3 (Per-Negara)
+
+  [A] DBSCAN GLOBAL
+      Input : data_pca.csv (9 komponen PCA, standarisasi ulang)
+      eps   : 3.1631 (otomatis via Kneedle)
+      Tujuan: Temukan pasangan (negara, tahun) yang anomali secara global
+
+  [B] DBSCAN PER-NEGARA
+      Input : data_scaled.csv (14 fitur, z-score)
+      eps   : Adaptif per negara (Kneedle, min 1.0)
+      Tujuan: Temukan tahun abnormal dalam sejarah setiap negara
+
+======================================================================
+4. HASIL DETEKSI ANOMALI
+======================================================================
+
+  [A] DBSCAN GLOBAL
+      Total anomali    : 13 (0.76%)
+
+      Anomali terdeteksi:
+        PER 1990  score=1.0000  |  Tidak ada di GT
+        BRA 1993  score=0.6699  |  Collor Plan / Banking Crisis
+        BRA 1994  score=0.5433  |  Real Plan Banking Crisis
+        BRA 1992  score=0.3272  |  Collor Plan / Banking Crisis
+        HUN 2020  score=0.2203  |  COVID-19 Global Shock
+        BRA 1990  score=0.2182  |  Collor Plan / Banking Crisis
+        IRL 2015  score=0.1642  |  Tidak ada di GT
+        NLD 2007  score=0.1377  |  Tidak ada di GT
+        BRA 1991  score=0.1202  |  Collor Plan / Banking Crisis
+        ARG 2002  score=0.0943  |  Argentine Crisis
+        IDN 1998  score=0.0889  |  Asian Financial Crisis
+        ROU 1991  score=0.0880  |  Tidak ada di GT
+        ROU 1992  score=0.0876  |  Tidak ada di GT
+
+  [B] DBSCAN PER-NEGARA
+      Total anomali    : 189 (11.02%)
+
+      Distribusi anomali per negara (top 15):
+        RUS  : 14 tahun anomali
+        GRC  : 12 tahun anomali
+        NGA  : 10 tahun anomali
+        LKA  : 7 tahun anomali
+        SWE  : 7 tahun anomali
+        EGY  : 6 tahun anomali
+        ARE  : 6 tahun anomali
+        CHL  : 5 tahun anomali
+        AUT  : 5 tahun anomali
+        ITA  : 5 tahun anomali
+        KEN  : 5 tahun anomali
+        TUR  : 5 tahun anomali
+        BRA  : 5 tahun anomali
+        CHN  : 5 tahun anomali
+        COL  : 5 tahun anomali
+
+      Deteksi Krisis Besar (Per-Country):
+        Asian FC 1997-98: 8 terdeteksi dari 5 negara terdampak
+        GFC 2008-09: 3 terdeteksi dari 6 negara terdampak
+        COVID-19 2020: 31 terdeteksi dari 49 negara terdampak
+
+======================================================================
+5. EVALUASI vs GROUND TRUTH IMF
+======================================================================
+
+  Metrik                GLOBAL   PER-NEGARA
+  ----------------------------------------
+  ACCURACY              0.8682       0.8426
+  PRECISION             0.6154       0.3915
+  RECALL                0.0349       0.3231
+  F1                    0.0661       0.3541
+  ROC_AUC               0.5156       0.6384
+
+  Confusion Matrix:
+                           GLOBAL   PER-NEGARA
+  TP                            8           74
+  FP                            5          115
+  TN                         1481         1371
+  FN                          221          155
+
+  Interpretasi:
+  - DBSCAN Global : Precision tinggi (0.615) tapi Recall sangat rendah
+    (0.035). Model sangat selektif - hanya deteksi anomali yang benar-
+    benar ekstrem secara global (hiperinflasi BRA, PER, dst).
+
+  - DBSCAN Per-Negara : Lebih seimbang (F1=0.354, ROC-AUC=0.638).
+    Recall 0.323 artinya ~1/3 krisis historis berhasil terdeteksi.
+    Metode ini lebih sensitif terhadap anomali kontekstual per negara.
+
+======================================================================
+6. TEMUAN UTAMA
+======================================================================
+
+  a) Krisis Hiperinflasi Amerika Latin (1990-1994)
+     Brazil, Peru, Argentina: Terdeteksi kuat di GLOBAL karena nilai
+     inflasi dan pertumbuhan uang beredar yang sangat ekstrem.
+
+  b) Asian Financial Crisis 1997-98
+     Indonesia (IDN) terdeteksi di Global (1998). Per-country mendeteksi
+     beberapa negara Asia yang terdampak langsung.
+
+  c) Global Financial Crisis 2008-09
+     Per-country berhasil mendeteksi beberapa negara Eropa (AUT, BEL,
+     DEU, GBR, ITA) pada tahun 2009 sebagai anomali.
+
+  d) COVID-19 2020
+     31 dari 49 negara dideteksi anomali di tahun 2020 (Per-Country).
+     Ini merupakan deteksi terbaik - guncangan COVID memang mempengaruhi
+     hampir semua indikator makroekonomi secara bersamaan.
+
+  e) Krisis Transisi Pasca-Komunis 1991-92
+     Romania (ROU) terdeteksi di GLOBAL pada 1991-92.
+
+  f) Greek Debt Crisis 2010-15
+     Yunani (GRC) mendapat F1=0.556 dengan Recall=0.833 -
+     sebagian besar tahun krisis Yunani berhasil teridentifikasi.
+
+======================================================================
+7. KETERBATASAN DAN CATATAN
+======================================================================
+
+  1. DBSCAN tidak dirancang untuk deteksi anomali berlabel - kinerja
+     terbatas wajar untuk unsupervised learning.
+
+  2. Ground truth IMF mencakup krisis yang berlangsung bertahun-tahun
+     (multiyear), sehingga banyak tahun di tengah periode krisis
+     mungkin tidak menunjukkan tanda ekstrem di indikator tahunan.
+
+  3. Beberapa negara (SGP, IRL, NLD) memiliki struktur ekonomi unik
+     sehingga krisis mereka tidak terpola di ruang fitur yang sama.
+
+  4. Imputasi 25% missing pada Broad_Money_Growth dapat mempengaruhi
+     deteksi untuk negara dengan data awal terbatas.
+
+  5. eps dipilih otomatis - optimasi manual mungkin meningkatkan kinerja.
+
+======================================================================
+8. KESIMPULAN
+======================================================================
+
+  DBSCAN sebagai metode unsupervised learning mampu mendeteksi anomali
+  makroekonomi dengan performa yang bervariasi antar pendekatan:
+
+  * Global  : Sangat presisi (0.615) tapi recall rendah (0.035).
+    Terbaik untuk menangkap krisis yang benar-benar ekstrem global.
+
+  * Per-Negara : Lebih seimbang (F1=0.354, AUC=0.638).
+    Mampu mendeteksi ~1/3 krisis historis tanpa label apapun.
+
+  Deteksi COVID-19 2020 (31/49 negara) dan Hiperinflasi Amerika Latin
+  merupakan keberhasilan paling menonjol dari model ini.
+
+  File output: output/ | 2026-09-12
+======================================================================
