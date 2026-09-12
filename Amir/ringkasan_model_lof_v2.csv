@@ -1,0 +1,2 @@
+metode,n_neighbors_range,aggregation,contamination_rule,label_used_in_tuning,label_used_in_threshold,random_state,n_rows,n_predicted_anomaly,auc_roc_primary,average_precision_primary,precision_primary,recall_primary,f1_primary,auc_roc_resample_mean,auc_roc_resample_std,f1_resample_mean,f1_resample_std
+Local Outlier Factor (label-free),"[5, 10, 15, 20, 30, 50]",max LOF score across n_neighbors range (Breunig et al. 2000),anomaly_score > 1.5 (sklearn contamination=auto equivalent),False,False,42,1715,171,0.7099,0.2427,0.2456,0.1834,0.21,0.7068,0.0106,0.2265,0.0153
