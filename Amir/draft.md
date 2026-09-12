@@ -66,6 +66,7 @@ Keunggulan konseptual LOF terhadap konteks makroekonomi global adalah kemampuann
 - **Auskalnis, Paulauskas, & Baskys (2018)** menerapkan LOF untuk deteksi intrusi pada lalu lintas jaringan komputer (dataset NSL-KDD), melatih model hanya pada data normal dan secara eksplisit menguji pengaruh berbagai nilai ambang batas terhadap akurasi deteksi, sejalan dengan analisis sensitivitas ambang batas yang juga dilakukan pada penelitian ini (§4.2).
 - **Budiarto, Permanasari, & Fauziati (2019)** membandingkan K-Means, LOF, dan One-Class SVM untuk deteksi anomali pada data penggunaan obat rumah sakit, menemukan bahwa OC-SVM sedikit mengungguli LOF dan K-Means pada dataset mereka, namun ketiga paradigma (*partitional*, *density-based*, *boundary-based*) tetap berhasil menemukan outlier yang berbeda-beda, mendukung rasional proyek ini untuk menggabungkan LOF dengan lima paradigma lain melalui *Majority Voting* alih-alih mengandalkan satu algoritma tunggal.
 - **Mokua, wa Maina, & Kiragu (2021)** membandingkan LOF, Isolation Forest, Extended Isolation Forest, dan Robust Random Cut Forest untuk deteksi anomali pada data sensor kualitas air (pH dan turbiditas) di Kenya, menemukan bahwa LOF berhasil mendeteksi seluruh outlier dengan benar pada kedua subset data yang diuji sekaligus tercepat secara komputasi dibanding tiga algoritma pembanding lainnya, menunjukkan keunggulan LOF pada data sensor/time-series berdimensi rendah selain konteks jaringan komputer dan data kesehatan yang telah dibahas di atas.
+- **Sugidamayatno & Lelono (2019)** menerapkan LOF untuk deteksi fraud pada transaksi kartu kredit dan secara eksplisit memposisikan hasilnya sebagai sinyal peringatan dini (*early warning*) bagi bank, dengan akurasi LOF (96%) mengungguli algoritma pembanding INFLO (84%) dan AVF (77%) pada 1.803 transaksi dari lima nasabah, memperkuat rasional penggunaan LOF sebagai komponen EWS pada konteks finansial yang lebih luas.
 - **Goldstein & Uchida (2016)** dalam evaluasi komparatif algoritma deteksi anomali *unsupervised* multivariat menemukan bahwa performa LOF cenderung menurun pada dataset berdimensi tinggi (>10 fitur) akibat *curse of dimensionality*, temuan yang relevan mengingat dataset penelitian ini memiliki 14 fitur, dan menjadi salah satu keterbatasan yang dibahas pada bagian hasil.
 - **Laeven & Valencia (2018)** menyusun basis data krisis sistemik (perbankan, mata uang, utang berdaulat) per negara-tahun yang menjadi rujukan taksonomi *ground truth* eksternal pada penelitian ini.
 
@@ -286,7 +287,8 @@ LOF terbukti efektif menangkap anomali kontekstual/regional dan idiosinkratik, d
 9. Mokua, N., wa Maina, C., & Kiragu, H. (2021). Anomaly Detection for Raw Water Quality: A Comparative Analysis of the Local Outlier Factor Algorithm and the Random Forest Algorithms. *International Journal of Computer Applications*, 174(26), 47–54.
 10. Pedregosa, F., et al. (2011). Scikit-learn: Machine Learning in Python. *Journal of Machine Learning Research*, 12, 2825–2830.
 11. Reinhart, C. M., & Rogoff, K. S. (2009). *This Time Is Different: Eight Centuries of Financial Folly*. Princeton University Press.
-12. World Bank. Global Economic Monitor. https://data.worldbank.org/
+12. Sugidamayatno, S., & Lelono, D. (2019). Outlier Detection Credit Card Transactions Using Local Outlier Factor Algorithm (LOF). *IJCCS (Indonesian Journal of Computing and Cybernetics Systems)*, 13(4), 409–420. https://doi.org/10.22146/ijccs.46561
+13. World Bank. Global Economic Monitor. https://data.worldbank.org/
 
 ---
 
