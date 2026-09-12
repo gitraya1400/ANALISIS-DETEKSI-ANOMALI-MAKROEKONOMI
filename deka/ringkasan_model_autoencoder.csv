@@ -1,0 +1,2 @@
+model,paradigma,n_obs,n_features,threshold,n_anomali,precision,recall,f1_score,auc_roc,auc_pr,auc_roc_test,auc_roc_tanpa2020,auc_lead1,auc_lead2,seed
+Autoencoder,Semi-supervised Novelty Detection (Deep Learning),1715,14,0.9933191561040435,117,0.36752136752136755,0.18777292576419213,0.24855491329479767,0.719648304113502,0.29160136580529455,0.725262889928917,0.686185883056677,0.62453123038821,0.5955217881730608,42
