@@ -15,9 +15,9 @@
 - Scope is `Amir/` only. Do not modify any other team member's folder (`raya/`, `bram/`, `deka/`) or the group-level root files (`data_cleaned.csv`, `data_with_labels.csv`, etc.).
 - Nothing existing gets overwritten. All new files use the `_v2` suffix.
 - Missingness filter (feature >50%, then row >30%) runs on **raw** missingness, before interpolation/imputation — never after (a post-imputation check is a dead check, since imputation fills every remaining NaN by construction).
-- `crisis_label` is built last, strictly from the six-episode rule in the spec, and never referenced by any earlier step.
+- `crisis_label` is built last, by joining `Amir/ground_truth_imf.csv` on `(economy, year)`, and never referenced by any earlier step.
 - Scaler is `RobustScaler`, not `StandardScaler` (per group guidance for distance-based methods).
-- Verified real-data numbers the integration test must match exactly: 0 features dropped; 90 rows dropped (all non-crisis); final shape 1625 rows; `crisis_label` sums to 175 (10.8% of 1625).
+- Verified real-data numbers the integration test must match exactly: 0 features dropped; 90 rows dropped (3 of them crisis rows — Poland 1992–1994); final shape 1625 rows; `crisis_label` sums to 226 (13.9% of 1625).
 
 ---
 
@@ -518,12 +518,12 @@ git commit -m "feat(lof-v2): add RobustScaler standardization"
 - Modify: `Amir/test_preprocessing_lof_v2.py`
 
 **Interfaces:**
-- Consumes: a DataFrame with `economy` and `year` columns (any point after Task 1 works; convention is to call this last).
-- Produces: `build_crisis_label(df: pd.DataFrame) -> pd.DataFrame` — adds an integer `crisis_label` column (1/0) per the spec's six-episode rule. Also exports `CRISIS_EPISODES` at module level so Task 8 (and any future report code) can reference the same source of truth instead of duplicating the list.
+- Consumes: a DataFrame with `economy` and `year` columns (any point after Task 1 works; convention is to call this last), plus a `ground_truth` DataFrame shaped like `Amir/ground_truth_imf.csv` (must have `economy`, `year`, `is_crisis` columns).
+- Produces: `build_crisis_label(df: pd.DataFrame, ground_truth: pd.DataFrame) -> pd.DataFrame` — left-joins on `(economy, year)` and adds an integer `crisis_label` column copied from `is_crisis`. Raises `ValueError` if any row in `df` has no matching row in `ground_truth`, rather than silently leaving a NaN — a mismatch here means a country-code or coverage change in one of the two files, not something to paper over.
 
 - [ ] **Step 1: Write the failing test**
 
-Append import and test:
+Append import and tests:
 
 ```python
 from preprocessing_lof_v2 import (
@@ -538,17 +538,37 @@ from preprocessing_lof_v2 import (
 ```
 
 ```python
-def test_build_crisis_label_matches_six_episode_rule():
+def test_build_crisis_label_joins_external_ground_truth():
     df = pd.DataFrame({
-        "economy": ["IDN", "IDN", "RUS", "ARG", "USA", "FRA", "GRC", "JPN", "JPN"],
-        "year":    [1997,  1999,  1998,  2001,  2008,  1990,  2011,  2020,  1990],
+        "economy": ["IDN", "IDN", "USA"],
+        "year": [1997, 1998, 1990],
     })
-    result = build_crisis_label(df)
-    assert result["crisis_label"].tolist() == [1, 0, 1, 1, 1, 0, 1, 1, 0]
-    print("test_build_crisis_label_matches_six_episode_rule: OK")
+    ground_truth = pd.DataFrame({
+        "economy": ["IDN", "IDN", "USA"],
+        "year": [1997, 1998, 1990],
+        "is_crisis": [1, 0, 0],
+    })
+    result = build_crisis_label(df, ground_truth)
+    assert result["crisis_label"].tolist() == [1, 0, 0]
+    assert "is_crisis" not in result.columns
+    print("test_build_crisis_label_joins_external_ground_truth: OK")
+
+
+def test_build_crisis_label_raises_on_unmatched_row():
+    df = pd.DataFrame({"economy": ["ZZZ"], "year": [2000]})
+    ground_truth = pd.DataFrame({
+        "economy": ["IDN"], "year": [1997], "is_crisis": [1],
+    })
+    raised = False
+    try:
+        build_crisis_label(df, ground_truth)
+    except ValueError:
+        raised = True
+    assert raised
+    print("test_build_crisis_label_raises_on_unmatched_row: OK")
 ```
 
-Add the call to `__main__`.
+Add both calls to `__main__`.
 
 - [ ] **Step 2: Run test to verify it fails**
 
@@ -560,39 +580,32 @@ Expected: `ImportError: cannot import name 'build_crisis_label'`.
 Add to `Amir/preprocessing_lof_v2.py`:
 
 ```python
-CRISIS_EPISODES = [
-    (["IDN", "THA", "MYS", "KOR", "PHL"], [1997, 1998]),
-    (["RUS"], [1998]),
-    (["ARG"], [2001, 2002]),
-    ("ALL", [2008, 2009]),
-    (["GRC", "PRT", "IRL", "ESP", "ITA"], [2010, 2011, 2012]),
-    ("ALL", [2020]),
-]
-
-
-def build_crisis_label(df):
-    df = df.copy()
-    label = pd.Series(0, index=df.index)
-    for countries, years in CRISIS_EPISODES:
-        if countries == "ALL":
-            mask = df["year"].isin(years)
-        else:
-            mask = df["economy"].isin(countries) & df["year"].isin(years)
-        label = label.where(~mask, 1)
-    df["crisis_label"] = label
-    return df
+def build_crisis_label(df, ground_truth):
+    merged = df.merge(
+        ground_truth[["economy", "year", "is_crisis"]],
+        on=["economy", "year"],
+        how="left",
+    )
+    if merged["is_crisis"].isna().any():
+        missing = merged.loc[merged["is_crisis"].isna(), ["economy", "year"]]
+        raise ValueError(
+            f"No ground-truth crisis label for rows:\n{missing.to_string(index=False)}"
+        )
+    merged["crisis_label"] = merged["is_crisis"].astype("int64")
+    merged = merged.drop(columns=["is_crisis"])
+    return merged
 ```
 
 - [ ] **Step 4: Run test to verify it passes**
 
 Run: `cd Amir && python test_preprocessing_lof_v2.py`
-Expected: all eight tests print `OK`, exit 0.
+Expected: all nine tests print `OK`, exit 0.
 
 - [ ] **Step 5: Commit**
 
 ```bash
 git add Amir/preprocessing_lof_v2.py Amir/test_preprocessing_lof_v2.py
-git commit -m "feat(lof-v2): add six-episode crisis_label construction"
+git commit -m "feat(lof-v2): build crisis_label from ground_truth_imf.csv join"
 ```
 
 ---
@@ -605,8 +618,8 @@ git commit -m "feat(lof-v2): add six-episode crisis_label construction"
 - Creates at runtime (not committed): `Amir/data_cleaned_v2.csv`
 
 **Interfaces:**
-- Consumes: all seven functions from Tasks 1–7.
-- Produces: `run_pipeline(raw_path: str, output_path: str) -> pd.DataFrame` — runs the full pipeline in order, writes the result to `output_path`, prints a short diagnostic summary, and returns the final DataFrame. This is the only function the future modeling plan needs to call.
+- Consumes: all seven functions from Tasks 1–7, plus `Amir/ground_truth_imf.csv` on disk.
+- Produces: `run_pipeline(raw_path: str, ground_truth_path: str, output_path: str) -> pd.DataFrame` — runs the full pipeline in order, writes the result to `output_path`, prints a short diagnostic summary, and returns the final DataFrame. This is the only function the future modeling plan needs to call.
 
 - [ ] **Step 1: Write the failing test**
 
@@ -619,9 +632,10 @@ from preprocessing_lof_v2 import run_pipeline
 ```python
 def test_run_pipeline_on_real_data_matches_verified_counts():
     raw_path = os.path.join(os.path.dirname(__file__), "raw_data_master.csv")
+    ground_truth_path = os.path.join(os.path.dirname(__file__), "ground_truth_imf.csv")
     with tempfile.TemporaryDirectory() as tmp:
         output_path = os.path.join(tmp, "data_cleaned_v2.csv")
-        result = run_pipeline(raw_path, output_path)
+        result = run_pipeline(raw_path, ground_truth_path, output_path)
 
         assert os.path.exists(output_path)
         reloaded = pd.read_csv(output_path)
@@ -631,7 +645,7 @@ def test_run_pipeline_on_real_data_matches_verified_counts():
     assert len(feature_cols) == 14
     assert result[feature_cols].isna().sum().sum() == 0
     assert len(result) == 1625
-    assert int(result["crisis_label"].sum()) == 175
+    assert int(result["crisis_label"].sum()) == 226
     print("test_run_pipeline_on_real_data_matches_verified_counts: OK")
 ```
 
@@ -655,7 +669,7 @@ RAW_FEATURE_COLS = [
 ]
 
 
-def run_pipeline(raw_path, output_path):
+def run_pipeline(raw_path, ground_truth_path, output_path):
     df = load_raw_data(raw_path)
     df = add_exchange_depreciation(df)
     df, dropped_features = drop_high_missing(df, RAW_FEATURE_COLS)
@@ -663,7 +677,8 @@ def run_pipeline(raw_path, output_path):
     df = interpolate_per_country(df, remaining_cols)
     df = impute_remaining(df, remaining_cols)
     df = scale_features(df, remaining_cols)
-    df = build_crisis_label(df)
+    ground_truth = pd.read_csv(ground_truth_path)
+    df = build_crisis_label(df, ground_truth)
     df.to_csv(output_path, index=False)
 
     n_crisis = int(df["crisis_label"].sum())
@@ -678,8 +693,8 @@ def run_pipeline(raw_path, output_path):
 if __name__ == "__main__":
     import sys
 
-    if len(sys.argv) == 3:
-        run_pipeline(sys.argv[1], sys.argv[2])
+    if len(sys.argv) == 4:
+        run_pipeline(sys.argv[1], sys.argv[2], sys.argv[3])
 ```
 
 Note: `run_pipeline` references `RAW_FEATURE_COLS`, a name distinct from the test file's own `feature_cols` local variable — don't confuse the two when reading this task.
@@ -687,13 +702,13 @@ Note: `run_pipeline` references `RAW_FEATURE_COLS`, a name distinct from the tes
 - [ ] **Step 4: Run test to verify it passes**
 
 Run: `cd Amir && python test_preprocessing_lof_v2.py`
-Expected: all nine tests print `OK`, exit 0. Also run the CLI path directly and confirm the printed summary matches the verified numbers:
+Expected: all ten tests print `OK`, exit 0. Also run the CLI path directly and confirm the printed summary matches the verified numbers:
 
-Run: `cd Amir && python preprocessing_lof_v2.py raw_data_master.csv data_cleaned_v2.csv`
+Run: `cd Amir && python preprocessing_lof_v2.py raw_data_master.csv ground_truth_imf.csv data_cleaned_v2.csv`
 Expected output:
 ```
 Dropped features (>50% missing): []
-Rows: 1625, Crisis rows: 175 (10.8% of retained rows)
+Rows: 1625, Crisis rows: 226 (13.9% of retained rows)
 ```
 
 - [ ] **Step 5: Commit**
