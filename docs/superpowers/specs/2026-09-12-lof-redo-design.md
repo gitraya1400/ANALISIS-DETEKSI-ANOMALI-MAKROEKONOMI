@@ -28,9 +28,9 @@ Applied in this order:
 
 1. **Sort** by `economy`, then `year`.
 2. **Exchange rate transform:** `Exchange_Depreciation = groupby('economy')['Exchange_Rate'].pct_change() * 100`; drop the nominal `Exchange_Rate` column. This structurally produces a NaN for each country's first observed year — expected, not a data defect. Feature count stays at 14.
-3. **Interpolation:** for every feature column, linear interpolation per country (`groupby('economy')[col].transform(lambda x: x.interpolate(method='linear', limit_direction='both'))`). This also resolves the year-1 `Exchange_Depreciation` NaN by extending from the next valid year.
-4. **Remaining-NaN fallback:** for any NaN interpolation couldn't reach (a country missing an entire indicator's series), fill with that indicator's per-country median; if a country has zero valid values for a column, fall back to `KNNImputer` (k=5, default Euclidean) fit across the full feature matrix.
-5. **Row/feature quality filter:** drop any feature with >50% missing before imputation (none qualify on this dataset — verify and record the check, don't skip it just because we expect it to pass); drop any row with >30% of its 14 features still missing after step 4 (should be ~0 rows; record the count either way).
+3. **Missingness quality filter (on raw missingness, before any filling):** drop any feature with >50% missing (none qualify on this dataset — verify and record the check, don't skip it just because we expect it to pass); then, among the retained features, drop any row with >30% missing. This must run before interpolation/imputation — checking it afterward is meaningless, since the imputation fallback in step 5 fills every remaining NaN by construction, so a post-imputation missingness check would never trigger.
+4. **Interpolation:** for every retained feature column, linear interpolation per country (`groupby('economy')[col].transform(lambda x: x.interpolate(method='linear', limit_direction='both'))`). Verified empirically: this fills interior gaps with true linear interpolation, and fills leading/trailing gaps by carrying the nearest valid value in that direction (e.g. `[NaN, NaN, 10, 20, NaN, 40, NaN, NaN]` → `[10, 10, 10, 20, 30, 40, 40, 40]`). This also resolves the year-1 `Exchange_Depreciation` NaN by extending from the next valid year.
+5. **Remaining-NaN fallback:** interpolation can only leave a NaN behind when a country has zero valid observations at all for a column (nothing to interpolate from or extend). For any such remaining NaN, attempt per-country median first (a no-op in this exact scenario, kept as defense-in-depth in case future data breaks the "every country has ≥1 valid value" assumption); fall back to `KNNImputer` (k=5, default Euclidean) fit across the full feature matrix for whatever the median pass couldn't fill. After this step zero NaNs remain in the retained columns.
 6. **Scaling:** `RobustScaler()` fit on all 14 features across the full panel (median/IQR-based — chosen over `StandardScaler` for resilience to macro shocks like hyperinflation or currency collapse, consistent with the group's guidance that distance-based methods need outlier-resistant scaling).
 7. **Crisis label (built last, never upstream of steps 1–6):** `crisis_label = 1` iff `(economy, year)` matches one of:
    - Asia Financial Crisis: `IDN, THA, MYS, KOR, PHL` × `{1997, 1998}`
@@ -42,7 +42,7 @@ Applied in this order:
 
    else `0`. Expected count: (5×2) + (1×1) + (1×2) + (49×2) + (5×3) + (49×1) = 10+1+2+98+15+49 = **175** crisis rows (~10.2% of 1715) — record the actual count once built and compare against this expectation; a mismatch means a country-code or year typo in the implementation, not a new discovery about the data.
 
-Output artifact: `Amir/data_cleaned_v2.csv` — 1715 rows (unless the row filter in step 5 drops any), 14 scaled features + `economy` + `year` + `crisis_label`.
+Output artifact: `Amir/data_cleaned_v2.csv` — 1715 rows (unless the row filter in step 3 drops any), 14 scaled features + `economy` + `year` + `crisis_label`.
 
 ## 4. Modeling (LOF) — fully label-free hyperparameter selection
 
