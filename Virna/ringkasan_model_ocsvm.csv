@@ -1,2 +1,2 @@
 model,kernel,nu,gamma,n_anomalies,pct_anomalies,precision,recall,f1_score,roc_auc,pr_auc,TN,FP,FN,TP
-One-Class SVM,rbf,0.25,0.001,429,25.03,0.345,0.4498,0.3905,0.6599,0.29,1104,281,181,148
+One-Class SVM,rbf,0.25,0.5,443,25.83,0.2641,0.5109,0.3482,0.6858,0.2781,1160,326,112,117
