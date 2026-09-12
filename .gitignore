@@ -1,0 +1,8 @@
+# Only Amir/ is meant to be pushed by this checkout going forward.
+# This does NOT untrack files already committed (other members' folders,
+# root notebooks/data, docs/) - it only stops NEW untracked files outside
+# Amir/ from being added by accident.
+/*
+!/.gitignore
+!/Amir/
+!/Amir/**
