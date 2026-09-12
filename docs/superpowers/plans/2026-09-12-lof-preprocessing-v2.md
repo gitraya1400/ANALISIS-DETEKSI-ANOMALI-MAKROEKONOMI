@@ -8,16 +8,18 @@
 
 **Tech Stack:** Python 3.14 (`python` / `py -3` on this machine — both resolve to the same interpreter with pandas 3.0.2 and scikit-learn 1.8.0 installed; `pytest` is **not** installed, so tests are plain scripts using `assert`, run directly with `python <file>.py`). No new dependencies are needed or should be added.
 
-**Spec:** `docs/superpowers/specs/2026-09-12-lof-redo-design.md` (§2–§3)
+**Spec:** `docs/superpowers/specs/2026-09-12-lof-redo-design.md` (§2 mandatory rules, §3–§4 data and preprocessing)
 
 ## Global Constraints
 
 - Scope is `Amir/` only. Do not modify any other team member's folder (`raya/`, `bram/`, `deka/`) or the group-level root files (`data_cleaned.csv`, `data_with_labels.csv`, etc.).
 - Nothing existing gets overwritten. All new files use the `_v2` suffix.
-- Missingness filter (feature >50%, then row >30%) runs on **raw** missingness, before interpolation/imputation — never after (a post-imputation check is a dead check, since imputation fills every remaining NaN by construction).
+- **No row is ever dropped, at any stage** (mandatory group-wide rule, spec §2). The output must have exactly 1715 rows, same as the input. Only *features* may be dropped (>50% missing), never rows.
+- Row order is `economy` ascending, then `year` ascending (mandatory group-wide rule, spec §2) — established once in Task 1 and never disturbed afterward.
+- Missingness feature-level filter (>50%) runs on **raw** missingness, before interpolation/imputation.
 - `crisis_label` is built last, by joining `Amir/ground_truth_imf.csv` on `(economy, year)`, and never referenced by any earlier step.
 - Scaler is `RobustScaler`, not `StandardScaler` (per group guidance for distance-based methods).
-- Verified real-data numbers the integration test must match exactly: 0 features dropped; 90 rows dropped (3 of them crisis rows — Poland 1992–1994); final shape 1625 rows; `crisis_label` sums to 226 (13.9% of 1625).
+- Verified real-data numbers the integration test must match exactly: 0 features dropped; 0 rows dropped; final shape 1715 rows; `crisis_label` sums to 229 (13.4% of 1715); zero remaining NaN after the fallback-imputation step (the 490 cells `KNNImputer` must fill are 14 (economy, feature) pairs with zero valid observations in their entire series — Nigeria's `Exports_GDP`/`Imports_GDP`/`Gross_Savings_GDP`/`Investment_GDP`, and `Broad_Money_Growth` for the 10 Eurozone countries in the panel).
 
 ---
 
@@ -180,7 +182,7 @@ git commit -m "feat(lof-v2): add Exchange_Rate to Exchange_Depreciation transfor
 
 ---
 
-### Task 3: `drop_high_missing`
+### Task 3: `drop_high_missing_features`
 
 **Files:**
 - Modify: `Amir/preprocessing_lof_v2.py`
@@ -188,7 +190,7 @@ git commit -m "feat(lof-v2): add Exchange_Rate to Exchange_Depreciation transfor
 
 **Interfaces:**
 - Consumes: a DataFrame and a list of feature column names to check.
-- Produces: `drop_high_missing(df: pd.DataFrame, feature_cols: list[str], feature_thresh: float = 0.5, row_thresh: float = 0.3) -> tuple[pd.DataFrame, list[str]]` — returns `(filtered_df, dropped_feature_names)`. Must run on **raw** (pre-interpolation) missingness. Later tasks (interpolation, imputation) only ever see the columns that survive this filter.
+- Produces: `drop_high_missing_features(df: pd.DataFrame, feature_cols: list[str], feature_thresh: float = 0.5) -> tuple[pd.DataFrame, list[str]]` — returns `(filtered_df, dropped_feature_names)`. Must run on **raw** (pre-interpolation) missingness. Later tasks (interpolation, imputation) only ever see the columns that survive this filter. **Never drops a row** — the group's mandatory output rule (spec §2) requires every output file to keep exactly the same 1715 rows as the input, so this function only ever removes columns.
 
 - [ ] **Step 1: Write the failing test**
 
@@ -198,28 +200,25 @@ Append import and test:
 from preprocessing_lof_v2 import (
     load_raw_data,
     add_exchange_depreciation,
-    drop_high_missing,
+    drop_high_missing_features,
 )
 ```
 
 ```python
-def test_drop_high_missing_drops_sparse_feature_and_sparse_row():
+def test_drop_high_missing_features_drops_only_sparse_feature():
     df = pd.DataFrame({
-        "feat_a": [None, None, None, 1.0],   # 3/4 = 75% missing -> dropped (feature)
-        "feat_b": [1.0, 2.0, 3.0, None],
-        "feat_c": [1.0, 2.0, 3.0, None],
-        "feat_d": [1.0, 2.0, 3.0, 5.0],
+        "feat_a": [None, None, None, 1.0],   # 3/4 = 75% missing -> dropped
+        "feat_b": [1.0, 2.0, 3.0, None],     # 1/4 = 25% missing -> kept as-is
+        "feat_c": [1.0, 2.0, 3.0, 4.0],      # 0% missing -> kept as-is
     })
-    # after dropping feat_a: row 3 has feat_b, feat_c missing = 2/3 = 66.7% -> dropped (row)
-    # rows 0,1,2 have 0% missing among feat_b/c/d -> kept
 
-    result, dropped = drop_high_missing(df, ["feat_a", "feat_b", "feat_c", "feat_d"])
+    result, dropped = drop_high_missing_features(df, ["feat_a", "feat_b", "feat_c"])
 
     assert dropped == ["feat_a"]
-    assert list(result.columns) == ["feat_b", "feat_c", "feat_d"]
-    assert len(result) == 3
-    assert result["feat_d"].tolist() == [1.0, 2.0, 3.0]
-    print("test_drop_high_missing_drops_sparse_feature_and_sparse_row: OK")
+    assert list(result.columns) == ["feat_b", "feat_c"]
+    assert len(result) == 4  # no row dropped, even though feat_b has a NaN
+    assert result["feat_c"].tolist() == [1.0, 2.0, 3.0, 4.0]
+    print("test_drop_high_missing_features_drops_only_sparse_feature: OK")
 ```
 
 Add the call to `__main__`.
@@ -227,26 +226,20 @@ Add the call to `__main__`.
 - [ ] **Step 2: Run test to verify it fails**
 
 Run: `cd Amir && python test_preprocessing_lof_v2.py`
-Expected: `ImportError: cannot import name 'drop_high_missing'`.
+Expected: `ImportError: cannot import name 'drop_high_missing_features'`.
 
 - [ ] **Step 3: Write minimal implementation**
 
 Add to `Amir/preprocessing_lof_v2.py`:
 
 ```python
-def drop_high_missing(df, feature_cols, feature_thresh=0.5, row_thresh=0.3):
+def drop_high_missing_features(df, feature_cols, feature_thresh=0.5):
     df = df.copy()
     feature_missing_rate = df[feature_cols].isna().mean()
     dropped_features = feature_missing_rate[
         feature_missing_rate > feature_thresh
     ].index.tolist()
-
-    remaining_cols = [c for c in feature_cols if c not in dropped_features]
     df = df.drop(columns=dropped_features)
-
-    row_missing_rate = df[remaining_cols].isna().mean(axis=1)
-    df = df[row_missing_rate <= row_thresh].reset_index(drop=True)
-
     return df, dropped_features
 ```
 
@@ -259,7 +252,7 @@ Expected: all three tests print `OK`, exit 0.
 
 ```bash
 git add Amir/preprocessing_lof_v2.py Amir/test_preprocessing_lof_v2.py
-git commit -m "feat(lof-v2): add raw-missingness feature/row filter"
+git commit -m "feat(lof-v2): add raw-missingness feature filter (no row drop)"
 ```
 
 ---
@@ -271,7 +264,7 @@ git commit -m "feat(lof-v2): add raw-missingness feature/row filter"
 - Modify: `Amir/test_preprocessing_lof_v2.py`
 
 **Interfaces:**
-- Consumes: a DataFrame (post `drop_high_missing`) and the list of surviving feature columns.
+- Consumes: a DataFrame (post `drop_high_missing_features`) and the list of surviving feature columns.
 - Produces: `interpolate_per_country(df: pd.DataFrame, feature_cols: list[str]) -> pd.DataFrame` — linear-interpolates each feature within each country's time series, extending to fill leading/trailing gaps with the nearest valid value. Only fails to fill a cell when a country has zero valid observations for that column across its whole series (handled by Task 5).
 
 - [ ] **Step 1: Write the failing test**
@@ -282,7 +275,7 @@ Append import and test:
 from preprocessing_lof_v2 import (
     load_raw_data,
     add_exchange_depreciation,
-    drop_high_missing,
+    drop_high_missing_features,
     interpolate_per_country,
 )
 import numpy as np
@@ -360,7 +353,7 @@ Append import and tests:
 from preprocessing_lof_v2 import (
     load_raw_data,
     add_exchange_depreciation,
-    drop_high_missing,
+    drop_high_missing_features,
     interpolate_per_country,
     impute_remaining,
 )
@@ -452,7 +445,7 @@ Append import and test:
 from preprocessing_lof_v2 import (
     load_raw_data,
     add_exchange_depreciation,
-    drop_high_missing,
+    drop_high_missing_features,
     interpolate_per_country,
     impute_remaining,
     scale_features,
@@ -529,7 +522,7 @@ Append import and tests:
 from preprocessing_lof_v2 import (
     load_raw_data,
     add_exchange_depreciation,
-    drop_high_missing,
+    drop_high_missing_features,
     interpolate_per_country,
     impute_remaining,
     scale_features,
@@ -644,8 +637,11 @@ def test_run_pipeline_on_real_data_matches_verified_counts():
     feature_cols = [c for c in result.columns if c not in ("economy", "year", "crisis_label")]
     assert len(feature_cols) == 14
     assert result[feature_cols].isna().sum().sum() == 0
-    assert len(result) == 1625
-    assert int(result["crisis_label"].sum()) == 226
+    assert len(result) == 1715  # mandatory: no row is ever dropped
+    assert int(result["crisis_label"].sum()) == 229
+    assert list(result[["economy", "year"]].itertuples(index=False, name=None)) == sorted(
+        result[["economy", "year"]].itertuples(index=False, name=None)
+    )  # mandatory: economy ascending, then year ascending
     print("test_run_pipeline_on_real_data_matches_verified_counts: OK")
 ```
 
@@ -672,7 +668,7 @@ RAW_FEATURE_COLS = [
 def run_pipeline(raw_path, ground_truth_path, output_path):
     df = load_raw_data(raw_path)
     df = add_exchange_depreciation(df)
-    df, dropped_features = drop_high_missing(df, RAW_FEATURE_COLS)
+    df, dropped_features = drop_high_missing_features(df, RAW_FEATURE_COLS)
     remaining_cols = [c for c in RAW_FEATURE_COLS if c not in dropped_features]
     df = interpolate_per_country(df, remaining_cols)
     df = impute_remaining(df, remaining_cols)
@@ -683,10 +679,8 @@ def run_pipeline(raw_path, ground_truth_path, output_path):
 
     n_crisis = int(df["crisis_label"].sum())
     print(f"Dropped features (>50% missing): {dropped_features}")
-    print(
-        f"Rows: {len(df)}, Crisis rows: {n_crisis} "
-        f"({n_crisis / len(df):.1%} of retained rows)"
-    )
+    print(f"Rows: {len(df)} (must be 1715, no row is ever dropped)")
+    print(f"Crisis rows: {n_crisis} ({n_crisis / len(df):.1%})")
     return df
 
 
@@ -708,7 +702,8 @@ Run: `cd Amir && python preprocessing_lof_v2.py raw_data_master.csv ground_truth
 Expected output:
 ```
 Dropped features (>50% missing): []
-Rows: 1625, Crisis rows: 226 (13.9% of retained rows)
+Rows: 1715 (must be 1715, no row is ever dropped)
+Crisis rows: 229 (13.4%)
 ```
 
 - [ ] **Step 5: Commit**
@@ -722,4 +717,4 @@ git commit -m "feat(lof-v2): add run_pipeline orchestrator and generate data_cle
 
 ## What comes after this plan
 
-`Amir/data_cleaned_v2.csv` is the input the future LOF modeling plan (spec §4: label-free `n_neighbors` range selection, `contamination='auto'`, transductive-primary + stratified-resampling-robustness evaluation) will consume. That plan is intentionally not part of this one — this plan's sole deliverable is a correct, tested preprocessing pipeline.
+`Amir/data_cleaned_v2.csv` is the input the future LOF modeling plan (spec §5: label-free `n_neighbors` range selection, `contamination='auto'`, transductive-primary + stratified-resampling-robustness evaluation, plus the mandatory §2 conventions — binary prediction encoding, `random_state=42`, and the exact `hasil_lof_v2.csv` column format) will consume. That plan is intentionally not part of this one — this plan's sole deliverable is a correct, tested preprocessing pipeline.
