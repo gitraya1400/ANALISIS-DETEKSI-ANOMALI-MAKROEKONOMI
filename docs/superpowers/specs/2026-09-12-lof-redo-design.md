@@ -42,7 +42,7 @@ Applied in this order:
 
    else `0`. Expected count: (5×2) + (1×1) + (1×2) + (49×2) + (5×3) + (49×1) = 10+1+2+98+15+49 = **175** crisis rows (~10.2% of 1715) — record the actual count once built and compare against this expectation; a mismatch means a country-code or year typo in the implementation, not a new discovery about the data.
 
-Output artifact: `Amir/data_cleaned_v2.csv` — 1715 rows (unless the row filter in step 3 drops any), 14 scaled features + `economy` + `year` + `crisis_label`.
+Output artifact: `Amir/data_cleaned_v2.csv`. Verified against the real raw file: 0 features exceed the 50% threshold; 90 rows exceed the 30% row threshold (concentrated in each country's earliest 1990s years, where World Bank coverage is sparsest) and are dropped, none of which are crisis rows — so the final artifact has 1625 rows, 14 scaled features + `economy` + `year` + `crisis_label`, with all 175 crisis rows retained (10.8% of 1625, not 10.2% of 1715 — the denominator shrinks because the dropped rows are all non-crisis).
 
 ## 4. Modeling (LOF) — fully label-free hyperparameter selection
 
