@@ -91,11 +91,21 @@ Nilai yang hilang ditangani lewat interpolasi linear per negara, dilanjutkan `KN
 
 Fitur distandardisasi dengan `RobustScaler` (berbasis median/IQR), bukan `StandardScaler`, karena LOF adalah metode berbasis jarak yang rentan terhadap lonjakan ekstrem (misalnya inflasi di atas 1000% pada episode hiperinflasi). `RobustScaler` lebih tahan terhadap lonjakan tersebut saat menentukan pusat dan skala data. Detail lengkap kode preprocessing ada di `Amir/preproccesingDataAmir.ipynb`.
 
+![Distribusi 14 indikator makroekonomi setelah RobustScaler](../extracted_images/Amir_img_1.png)
+*Gambar 3.1. Distribusi 14 indikator setelah RobustScaler.*
+
+Sebagian besar indikator terpusat rapi di sekitar 0 (garis putus-putus merah menandai titik nol), sesuai sifat `RobustScaler` yang memusatkan data pada median. Tiga kolom tampil sebagai satu batang tunggal menjulang di dekat nol dengan sumbu-x yang terentang jauh ke kanan: `Inflation_CPI`, `Broad_Money_Growth`, dan `Exchange_Depreciation`. Ini bukan kesalahan plot, melainkan bukti visual langsung bahwa beberapa negara mengalami lonjakan ekstrem (hiperinflasi, devaluasi mendadak) yang nilainya begitu jauh dari populasi umum sehingga seluruh observasi lain tampak menumpuk di satu titik pada skala yang sama. `RobustScaler` menjaga median dan IQR tidak terganggu oleh titik-titik ini, tetapi seperti dibahas di §4.4, nilai ekstremnya sendiri tetap ada dan memengaruhi perhitungan jarak Euclidean pada LOF.
+
 ### 3.2 Metode
 
 Algoritma yang dipakai adalah `sklearn.neighbors.LocalOutlierFactor` dengan `novelty=False`, yaitu mode transduktif yang dihitung sekaligus pada seluruh 1.715 baris, sama seperti cara Breunig et al. menerapkan LOF dan cara lima algoritma lain pada proyek ini dijalankan. Metrik jarak yang dipakai adalah Euclidean (Minkowski p=2).
 
 Nilai `n_neighbors` dipilih dengan menghitung skor LOF pada rentang `k ∈ {5, 10, 15, 20, 30, 50}`, kemudian diagregasi lewat nilai maksimum antar-k per titik, mengikuti rekomendasi Breunig et al. (2000). Tidak ada label krisis yang dilibatkan pada langkah ini.
+
+![Diagnostik skor LOF per rentang k](../extracted_images/Amir_img_2.png)
+*Gambar 3.2. Mean LOF score dan persentase observasi dengan skor di atas 1,5, dihitung terpisah untuk tiap nilai k.*
+
+Kedua panel naik bertahap seiring k membesar, dari k=5 sampai k=50, tanpa ada satu nilai k yang menonjol tajam dibanding yang lain. Pola naik yang landai ini justru mendukung keputusan memakai rentang k dan mengambil nilai maksimumnya, bukan memilih satu k tunggal: kalau ada satu k yang hasilnya jauh berbeda dari yang lain, memilih k tunggal lewat cara apapun (termasuk lewat label) akan sangat memengaruhi hasil akhir. Karena semua k dalam rentang ini memberi sinyal yang searah, agregasi maksimum menangkap titik yang menonjol di k manapun tanpa perlu menjatuhkan pilihan pada satu k saja.
 
 Status anomali ditentukan lewat ambang batas `anomaly_score > 1,5`, yaitu aturan `contamination='auto'` bawaan scikit-learn yang berbasis interpretasi skor LOF Breunig sendiri (LOF ≈ 1 normal, LOF ≫ 1 anomali).
 
@@ -137,7 +147,32 @@ Dengan konfigurasi pada §3.2, LOF menandai 171 observasi (10,0%) dari 1.715 bar
 | **Aktual: Normal** | TN = 1.357 | FP = 129 |
 | **Aktual: Krisis** | FN = 187 | TP = 42 |
 
+![Confusion matrix LOF v2](../extracted_images/Amir_img_4.png)
+*Gambar 4.1. Confusion matrix, versi visual dari tabel di atas.*
+
+Blok kiri atas (TN = 1.357) jauh lebih besar dari tiga blok lain digabung, wajar mengingat 86,6% data memang berlabel normal. Blok kanan bawah (TP = 42) adalah blok terkecil: dari 229 krisis aktual, LOF cuma menandai 42 dengan skor di atas ambang batas.
+
+![Kurva ROC dan Precision-Recall LOF v2](../extracted_images/Amir_img_5.png)
+*Gambar 4.2. ROC curve dan Precision-Recall curve, dihitung dari `anomaly_score` kontinu (tidak bergantung ambang batas 1,5).*
+
+Kurva ROC berada konsisten di atas garis diagonal acak di seluruh rentang False Positive Rate, mengonfirmasi `anomaly_score` punya kemampuan membedakan krisis dan normal secara nyata, meski tidak tajam (AUC 0,7099, idealnya mendekati 1). Kurva Precision-Recall menunjukkan pola yang lebih keras: precision anjlok cepat begitu recall melewati sekitar 0,1, dari mendekati 0,8 turun ke kisaran 0,25 sampai 0,3 dan bertahan di situ. Ini berarti LOF cukup percaya diri hanya pada segelintir krisis dengan skor paling ekstrem; begitu ambang batas diturunkan untuk menangkap krisis yang lebih halus, jumlah observasi normal yang ikut tertangkap naik jauh lebih cepat.
+
+![Distribusi anomaly_score Normal vs Krisis](../extracted_images/Amir_img_7.png)
+*Gambar 4.3. Distribusi `anomaly_score` untuk observasi normal dan krisis (kiri), dan boxplot pada rentang di bawah 3 (kanan).*
+
+Kedua distribusi tumpang tindih besar di kisaran 1,0 sampai 1,3. Median krisis sedikit lebih tinggi dari median normal pada boxplot, dan kotak IQR krisis condong ke nilai yang lebih tinggi, tetapi jangkauannya tetap banyak beririsan dengan normal, bukan dua kelompok yang terpisah bersih. Tumpang tindih inilah yang menjelaskan kenapa precision dan recall tidak tinggi meski ROC-AUC di atas acak: skor LOF membedakan kedua kelompok secara statistik, tetapi tidak cukup tegas untuk memisahkan keduanya dengan satu ambang batas tunggal.
+
 Robustness check (20 subsample *stratified* 80%, `random_state=42`) memberikan ROC-AUC = 0,7068 ± 0,0106 dan F1-Score = 0,2265 ± 0,0153. Sebaran yang sangat ketat ini menunjukkan hasil pada tabel di atas stabil pada subsample data yang berbeda-beda, bukan hasil kebetulan satu kali *fit*.
+
+![Sensitivitas ambang batas anomali](../extracted_images/Amir_img_3.png)
+*Gambar 4.4. Precision, Recall, F1-Score, dan jumlah `predicted_anomaly` pada berbagai nilai ambang batas, dengan garis putus-putus menandai ambang batas 1,5 yang dipakai.*
+
+Menaikkan ambang batas dari 1,5 ke atas menaikkan precision tapi menjatuhkan recall dan jumlah anomali terdeteksi dengan cepat, dari 171 observasi di ambang 1,5 menjadi tinggal puluhan begitu ambang mendekati 2,0. Menurunkan ambang batas punya efek sebaliknya: lebih banyak krisis tertangkap, tapi precision ikut turun karena semakin banyak observasi normal yang ikut lolos. Ambang batas 1,5 dipilih karena dasar literatur (interpretasi skor LOF Breunig), bukan karena titik ini memaksimalkan F1 pada data ini; grafik ini dilaporkan justru untuk menunjukkan bahwa pilihan ambang batas tidak diam-diam dioptimalkan ke arah angka yang paling bagus dilaporkan.
+
+![Trade-off ambang batas: TP vs FP](../extracted_images/Amir_img_6.png)
+*Gambar 4.5. Precision/Recall/F1 pada ambang batas 1,5 (kiri), dan sebaran True Positives vs False Positives pada berbagai ambang batas (kanan, titik merah menandai ambang batas yang dipakai).*
+
+Titik merah pada panel kanan berada di tengah kurva, bukan di ujung mana pun. Menggeser ambang batas ke kiri (lebih rendah) menaikkan TP tapi FP naik jauh lebih cepat karena populasi normal jauh lebih besar dari populasi krisis; menggesernya ke kanan (lebih tinggi) menekan FP tapi TP ikut anjlok karena krisis yang berhasil ditangkap makin sedikit.
 
 ### 4.3 Deteksi per Krisis Historis
 
@@ -154,6 +189,11 @@ Ground truth eksternal mencakup 28 episode bernama; berikut episode dengan jumla
 | Argentine Crisis | 3 | 2 | 66,7% |
 
 Pola yang muncul konsisten dengan sifat LOF sebagai detektor kerapatan lokal: krisis yang bersifat regional/idiosinkratik (Collor Plan, Argentine Crisis, Asian Financial Crisis) memiliki *detection rate* jauh lebih tinggi karena negara-negara terdampak menyimpang jauh dari *peer group*-nya. Sebaliknya, GFC (krisis yang berdampak merata secara global) paling sulit terdeteksi (6,4%) karena kerapatan lokal tiap titik tidak menurun signifikan relatif terhadap tetangganya ketika seluruh tetangga ikut terdampak bersamaan; skor rata-rata pada baris yang lolos deteksi (*false negative*) hanya 1,25, jauh di bawah ambang batas 1,5.
+
+![Deteksi per krisis, top 10 episode](../extracted_images/Amir_img_8.png)
+*Gambar 4.6. Detection rate (kiri) dan rata-rata `anomaly_score` (kanan) untuk 10 episode krisis dengan jumlah observasi terbanyak.*
+
+Panel kanan menyingkap sesuatu yang tidak terlihat dari detection rate saja: Real Plan Banking Crisis (Brasil) punya rata-rata `anomaly_score` 6,364, jauh melampaui episode lain yang semuanya di bawah 1,5, padahal detection rate-nya cuma 20,0% (1 dari 5 baris). Ini terjadi karena rata-rata sederhana gampang terseret oleh satu nilai ekstrem: sebagian baris di episode ini punya skor sangat tinggi (konsisten dengan sejarah hiperinflasi Brasil sebelum Real Plan 1994), sementara baris lain di episode yang sama tetap di bawah ambang batas 1,5, sehingga detection rate tetap rendah walau rata-rata skornya tinggi.
 
 ### 4.4 Top 10 Negara dengan Anomali Terbanyak
 
@@ -176,7 +216,17 @@ Skor tertinggi secara keseluruhan dipegang Peru tahun 1990 (`anomaly_score` = 10
 
 Temuan menarik lain: delapan negara pendiri Eurozone (Austria, Belgia, Jerman, Spanyol, Prancis, Italia, Belanda, Portugal) muncul bersamaan sebagai anomali pada tahun 1999, tahun peluncuran mata uang Euro. LOF menangkap *structural break* riil (konvergensi kurs, kredit, dan suku bunga menjelang Uni Moneter Eropa) yang tidak terdaftar sebagai "krisis" pada ground truth, sehingga sebagian besar terhitung sebagai *false positive* meski merepresentasikan perubahan struktural ekonomi yang nyata.
 
+![Top 15 negara dengan anomali terbanyak](../extracted_images/Amir_img_13.png)
+*Gambar 4.7. Top 15 negara berdasarkan jumlah anomali terdeteksi (kiri), dan hubungan antara rata-rata `anomaly_score` dengan jumlah anomali per negara (kanan).*
+
+Panel kanan memisahkan dua pola berbeda yang tersembunyi di balik tabel top 10. Arab Saudi, Hongaria, Belanda, dan Irlandia punya jumlah anomali terbanyak tapi rata-rata skornya rendah (di bawah 1,5), berarti negara-negara ini sering ditandai anomali dengan skor yang pas-pasan di atas ambang batas. Sebaliknya, Peru dan Brasil punya jumlah anomali yang jauh lebih sedikit tapi rata-rata skornya ekstrem (di atas 4,0), didorong oleh episode hiperinflasi tunggal yang sangat menonjol. Rusia berada di posisi tengah, dengan rata-rata skor yang cukup tinggi (sekitar 2,8) tapi masih di bawah dua negara Amerika Latin tersebut.
+
 ### 4.5 Analisis dan Interpretasi
+
+![Timeline mean anomaly_score dan perbandingan deteksi vs ground truth per tahun](../extracted_images/Amir_img_14.png)
+*Gambar 4.8. Rata-rata `anomaly_score` per tahun (atas), dan perbandingan persentase anomali terdeteksi dengan persentase krisis ground truth per tahun (bawah).*
+
+Panel atas menunjukkan lonjakan tajam ke hampir 4,9 pada tahun 1990, satu-satunya titik yang jauh di luar kisaran normal 1,1 sampai 1,3 di tahun-tahun lain; ini didorong oleh skor ekstrem Peru yang dibahas di §4.4, bukan pola tahun 1990 secara umum. Panel bawah memperlihatkan bahwa persentase deteksi dan persentase ground truth tidak selalu bergerak searah: pada periode 2008 sampai 2012 (mencakup GFC dan Krisis Utang Eropa), persentase ground truth krisis cukup tinggi tapi persentase deteksi tetap rendah, mengonfirmasi lagi kelemahan LOF pada krisis yang berlangsung lama dan berdampak merata. Sebaliknya di tahun 1990 dan 1999, persentase deteksi melampaui persentase ground truth, konsisten dengan temuan bahwa sebagian anomali yang ditandai di tahun-tahun itu (hiperinflasi Peru, peluncuran Euro) bukan krisis menurut ground truth.
 
 **Kekuatan:**
 1. Deteksi anomali kontekstual/lokal: mampu mengidentifikasi negara/tahun yang anomali dalam konteks *peer group* regionalnya, bukan hanya outlier global.
@@ -189,6 +239,28 @@ Temuan menarik lain: delapan negara pendiri Eurozone (Austria, Belgia, Jerman, S
 2. Bias terhadap negara dengan profil struktural ekstrem: negara petrostate (Arab Saudi, 14 dari 14 anomali adalah *false positive*) dan ekonomi sangat terbuka sering ditandai anomali karena karakteristik strukturalnya yang memang berbeda dari mayoritas, bukan semata-mata karena sedang mengalami krisis.
 3. Cakupan *ground truth* tidak mencakup seluruh bentuk anomali ekonomi riil: episode hiperinflasi murni (mis. Peru 1990) tidak masuk definisi krisis pada `ground_truth_imf.csv`, sehingga terhitung sebagai *false positive* meski secara ekonomi merupakan anomali yang sah.
 4. Sensitif terhadap dimensionalitas tinggi: sejalan dengan temuan Goldstein & Uchida (2016), performa LOF berpotensi menurun pada dataset dengan lebih dari 10 fitur akibat *curse of dimensionality*, relevan mengingat dataset ini memiliki 14 fitur.
+
+**Visualisasi Ruang Fitur.** Karena data punya 14 dimensi, dua teknik reduksi dimensi dipakai untuk melihat sebaran krisis dan prediksi LOF secara visual.
+
+![Proyeksi PCA: ground truth vs prediksi LOF](../extracted_images/Amir_img_9.png)
+*Gambar 4.9. Proyeksi PCA dua dimensi, diwarnai berdasarkan ground truth (kiri) dan prediksi LOF (kanan).*
+
+PC1 dan PC2 hanya menjelaskan 52,8% varians total, jadi proyeksi dua dimensi ini bukan gambaran lengkap dari struktur data 14 dimensi. Pada panel kiri, titik krisis (merah) tersebar di hampir seluruh area plot, tidak membentuk klaster terpisah dari titik normal (hijau). Pada panel kanan, titik yang ditandai LOF sebagai anomali (ungu) cenderung lebih banyak muncul di area pinggiran sebaran data, konsisten dengan cara kerja LOF yang menandai titik-titik pada wilayah berkerapatan rendah, bukan titik yang berada di satu klaster tertentu.
+
+![Proyeksi PCA dengan gradien anomaly_score](../extracted_images/Amir_img_10.png)
+*Gambar 4.10. Proyeksi PCA yang sama, diwarnai berdasarkan nilai `anomaly_score` (semakin merah semakin tinggi).*
+
+Titik-titik dengan warna paling gelap (skor tertinggi) tersebar di berbagai bagian plot, termasuk di tengah kerumunan utama, bukan cuma di pinggiran. Ini menunjukkan bahwa LOF tidak sekadar menandai titik yang jauh dari pusat data secara global (yang mudah terlihat di PCA), tetapi juga titik yang jarang secara lokal meski posisinya di ruang PCA tampak berdekatan dengan titik lain.
+
+![t-SNE: ground truth vs prediksi LOF](../extracted_images/Amir_img_11.png)
+*Gambar 4.11. Proyeksi t-SNE dua dimensi, diwarnai berdasarkan ground truth (kiri) dan prediksi LOF (kanan).*
+
+t-SNE (non-linear) memisahkan data menjadi klaster-klaster yang lebih jelas dibanding PCA. Satu klaster kecil di kiri bawah plot didominasi titik krisis, kemungkinan mewakili sekelompok episode dengan profil struktural yang sangat mirip satu sama lain. Di luar klaster itu, titik krisis tetap bercampur dengan titik normal di sebagian besar klaster lain, sejalan dengan temuan bahwa LOF hanya efektif pada krisis yang menyimpang tajam dari kelompoknya.
+
+![t-SNE dengan gradien anomaly_score](../extracted_images/Amir_img_12.png)
+*Gambar 4.12. Proyeksi t-SNE yang sama, diwarnai berdasarkan nilai `anomaly_score`.*
+
+Titik dengan skor tinggi tersebar di banyak klaster berbeda, bukan terkonsentrasi di satu klaster saja. Ini konsisten dengan sifat LOF yang menilai keanomalian relatif terhadap tetangga lokal masing-masing klaster, bukan terhadap satu definisi "anomali" yang berlaku sama untuk seluruh data.
 
 ---
 
