@@ -1,0 +1,9 @@
+metric,value
+n_normal_train,1385.0
+n_total,1714.0
+n_features,14.0
+k_components,9.0
+cumulative_var_at_k,0.9540711844960009
+UCL_SPE,2.0617676393810833
+UCL_T2,17.09109025041723
+alpha,0.05
