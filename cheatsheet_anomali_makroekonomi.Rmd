@@ -1,0 +1,575 @@
+---
+title: "**Cheatsheet UTS: Analisis Deteksi Anomali pada Indikator Makroekonomi Global**"
+subtitle: "Instrumen Early Warning System (EWS) Krisis Ekonomi | 3SI1 Kelompok 4"
+author: "Kelompok 4 — 3SI1"
+date: "`r format(Sys.Date(), '%d %B %Y')`"
+output:
+  html_document:
+    theme: flatly
+    highlight: tango
+    toc: true
+    toc_float:
+      collapsed: false
+      smooth_scroll: true
+    toc_depth: 3
+    number_sections: true
+    df_print: paged
+    css: |
+      body { font-size: 13px; }
+      h1 { color: #1a3c6e; border-bottom: 2px solid #1a3c6e; }
+      h2 { color: #2563a8; border-bottom: 1px solid #ccc; }
+      h3 { color: #3b7dd8; }
+      .highlight-box { background:#eef4ff; border-left:4px solid #2563a8; padding:10px 14px; margin:10px 0; border-radius:4px; }
+      .warning-box  { background:#fff8e1; border-left:4px solid #f59e0b; padding:10px 14px; margin:10px 0; border-radius:4px; }
+      .green-box    { background:#e8f5e9; border-left:4px solid #27ae60; padding:10px 14px; margin:10px 0; border-radius:4px; }
+      table.dataframe { font-size:12px; }
+editor_options: 
+  markdown: 
+    wrap: 72
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo=FALSE, warning=FALSE, message=FALSE)
+```
+
+------------------------------------------------------------------------
+
+# BAB I — PENDAHULUAN
+
+## Latar Belakang
+
+::: highlight-box
+**Inti masalah:** Krisis ekonomi global bersifat destruktif, sistemis,
+dan sulit diprediksi via pendekatan konvensional.
+:::
+
+**Episode Krisis Historis Utama:**
+
+| Krisis | Tahun | Dampak Utama |
+|------------------------|------------------------|------------------------|
+| Krisis Keuangan Asia | 1997–1998 | Mengguncang Asia Tenggara |
+| Krisis Dotcom | 2000–2001 | Menghapus triliunan dolar nilai pasar |
+| Krisis Keuangan Global (GFC) | 2008–2009 | Runtuhnya pasar subprime mortgage AS |
+| Pandemi COVID-19 | 2020 | Kontraksi ekonomi global **−3,3%** |
+
+**Mengapa EWS penting?**
+
+-   EWS (*Early Warning System*) mendeteksi **sinyal anomali** sebelum
+    krisis terjadi
+-   Memberikan waktu bagi pembuat kebijakan untuk tindakan **preventif**
+-   Kaminsky, Lizondo & Reinhart (1997): ekspor, output, harga aset,
+    cadangan internasional → sinyal krisis
+
+**Keterbatasan Pendekatan Konvensional:**
+
+-   Model **logit/probit** → asumsi distribusi kaku & relasi linier
+-   Data makroekonomi: multidimensional, non-linear, mengandung *noise*
+    & *missing values*
+-   **Solusi:** Unsupervised anomaly detection berbasis machine learning
+
+------------------------------------------------------------------------
+
+## Identifikasi Masalah
+
+1.  Sistem pemantauan konvensional **gagal mendeteksi sinyal dini**
+    krisis secara akurat dan tepat waktu
+2.  Pendekatan EWS tradisional (logit, probit, signal extraction)
+    **bergantung pada asumsi kaku** dan label krisis yang lengkap
+3.  **Belum ada** kajian komparatif sistematis antar 6 algoritma
+    unsupervised pada data makroekonomi multivariat lintas negara &
+    waktu
+4.  Kurangnya **peta distribusi spasial & temporal** anomali
+    makroekonomi global yang tervalidasi
+
+------------------------------------------------------------------------
+
+## Tujuan Penelitian
+
+1.  Deteksi & segmentasi anomali pada **49 negara, 1990–2024, 16
+    variabel** (tanpa label krisis)
+2.  Membandingkan **6 algoritma** unsupervised untuk menemukan yang
+    paling optimal
+3.  Menghasilkan **sistem EWS** berbasis anomali yang mengidentifikasi
+    negara/periode rentan pra-krisis
+4.  Memvalidasi hasil dengan **data krisis historis** (IMF & World Bank)
+
+------------------------------------------------------------------------
+
+## Dataset
+
+::: green-box
+**Sumber:** World Bank Global Economic Monitor API + data krisis
+historis IMF\
+**Cakupan:** 49 negara \| 1990–2024 \| **1.715 observasi** (setelah
+preprocessing)
+:::
+
+**Komposisi Negara (Purposive Sampling):**
+
+| Kelompok | Negara |
+|------------------------------------|------------------------------------|
+| G7 | AS, Inggris, Jerman, Prancis, Italia, Jepang, Kanada |
+| BRICS | Brasil, Rusia, India, Tiongkok, Afrika Selatan |
+| ASEAN | Indonesia, Thailand, Malaysia, Filipina, Vietnam, Singapura |
+| Asia Lainnya | Korea Selatan, Pakistan, Bangladesh, Sri Lanka |
+| Amerika Latin | Meksiko, Argentina, Kolombia, Chili, Peru |
+| Timur Tengah & Afrika | Arab Saudi, Turki, Mesir, Nigeria, Kenya, UAE |
+| Eropa Non-G7 | Spanyol, Belanda, Swedia, Norwegia, Polandia, Yunani, Portugal, Irlandia, Swiss, Austria, Belgia, Ceko, Hungaria, Rumania |
+| Oseania | Australia, Selandia Baru |
+
+------------------------------------------------------------------------
+
+# BAB II — KAJIAN LITERATUR
+
+## Konsep Krisis Ekonomi & EWS
+
+### Tipologi Krisis Ekonomi
+
+| Tipe | Definisi | Contoh |
+|------------------------|------------------------|------------------------|
+| **Currency Crisis** | Depresiasi nilai tukar tajam/serangan spekulatif cadangan devisa | Thailand 1997 |
+| **Banking Crisis** | Bank mengalami tekanan likuiditas/solvabilitas → intervensi pemerintah | AS 2008 |
+| **Debt Crisis** | Gagal bayar utang pemerintah/swasta | Zona Euro 2010–2012 |
+| **Krisis Sistemik** | Kombinasi di atas + mekanisme contagion antar negara | GFC 2008–2009 |
+
+### Generasi EWS
+
+| Generasi | Metode | Kelemahan |
+|------------------------|------------------------|------------------------|
+| 1 | Signal extraction (Kaminsky et al. 1997) — threshold per indikator | Tidak menangkap interaksi multivariat |
+| 2 | Logit & Probit probabilistik | Asumsi linearitas, butuh label lengkap |
+| **3 (fokus penelitian ini)** | **Unsupervised ML — anomaly detection** | Lebih fleksibel, tanpa label krisis |
+
+------------------------------------------------------------------------
+
+## Indikator Makroekonomi (16 Variabel)
+
+| \# | Indikator | Relevansi EWS |
+|----|----|----|
+| 1 | GDP Growth | Siklus bisnis; kontraksi → sinyal krisis |
+| 2 | GDP Per Capita Growth | Dinamika pertumbuhan riil |
+| 3 | Inflation CPI | Tekanan harga; inflasi tinggi → ketidakstabilan |
+| 4 | Total Reserves | Kemampuan defend nilai tukar & bayar utang LN |
+| 5 | Unemployment Rate | Memburuk tajam pasca-krisis |
+| 6 | Current Account to GDP | Posisi eksternal |
+| 7 | Trade to GDP | Keterbukaan ekonomi |
+| 8 | FDI Inflows to GDP | Kepercayaan investor asing |
+| 9 | Exports to GDP | Kerentanan eksternal |
+| 10 | Imports to GDP | Ketergantungan impor |
+| 11 | Exchange Rate | Volatilitas nilai tukar |
+| 12 | Gross Savings to GDP | Tabungan domestik |
+| 13 | Investment to GDP | Dinamika investasi |
+| 14 | Manufacturing Value Added | Produktivitas sektor riil |
+| 15–16 | (Variabel lain dari GEM) | Pelengkap gambaran makro |
+
+------------------------------------------------------------------------
+
+## Anomali & Tipologinya
+
+::: highlight-box
+**Definisi Anomali (Breunig et al. 2000):** Observasi yang *secara
+signifikan menyimpang* dari perilaku yang diharapkan mayoritas data —
+bersifat **relatif terhadap konteks lokal**.
+:::
+
+| Tipe | Definisi | Contoh Makroekonomi |
+|------------------------|------------------------|------------------------|
+| **Point Anomaly** | Satu observasi tunggal yang sangat berbeda | Lonjakan inflasi ekstrem 1 tahun |
+| **Contextual Anomaly** | Anomali hanya dalam konteks tertentu | Pengangguran 5% → anomali di Jepang, normal di negara lain |
+| **Collective Anomaly** | Serangkaian observasi kolektif yang menyimpang | Perlambatan GDP bertahap selama 3–4 tahun pra-krisis |
+
+------------------------------------------------------------------------
+
+## Enam Algoritma Deteksi Anomali
+
+### 1. Isolation Forest
+
+::: highlight-box
+**Prinsip:** Anomali lebih mudah "diisolasi" daripada data normal —
+membutuhkan *lebih sedikit partisi* untuk memisahkannya.
+:::
+
+-   Membangun **ensemble pohon isolasi** (*isolation trees*) secara acak
+-   **Anomaly score** = rata-rata panjang jalur (*path length*) dari
+    akar ke daun
+-   Anomali → path length **lebih pendek**
+-   **Kompleksitas:** $O(n \log n)$ — sangat efisien untuk data besar
+-   **Implementasi:** `contamination` rate dikalibrasi via grid search;
+    `random_state=42`
+-   **Kelebihan:** Cepat, efektif data berdimensi tinggi, tidak asumsi
+    distribusi
+-   **Kelemahan:** Kurang baik pada anomali kontekstual/kolektif
+
+**Formula Anomaly Score:** $$s(x, n) = 2^{-\frac{E[h(x)]}{c(n)}}$$ di
+mana $h(x)$ = path length, $c(n)$ = rata-rata path length di BST dengan
+$n$ sampel.
+
+------------------------------------------------------------------------
+
+### 2. Local Outlier Factor (LOF)
+
+::: highlight-box
+**Prinsip:** Membandingkan **kepadatan lokal** suatu titik dengan
+kepadatan tetangganya — titik yang jauh lebih jarang dari tetangganya
+adalah anomali.
+:::
+
+-   Menghitung **reachability distance** dan **local reachability
+    density (lrd)**
+-   **LOF score \> 1** → titik lebih jarang dari tetangga → anomali
+-   **Implementasi:** `n_neighbors` dikalibrasi via grid search
+    (biasanya 20–50)
+-   **Kelebihan:** Deteksi anomali *lokal*, tidak terpengaruh distribusi
+    global
+-   **Kelemahan:** Sensitif terhadap pilihan `n_neighbors`; lambat pada
+    data besar $O(n^2)$
+
+**Formula LOF:**
+$$LOF_k(p) = \frac{\sum_{o \in N_k(p)} \frac{lrd_k(o)}{lrd_k(p)}}{|N_k(p)|}$$
+
+------------------------------------------------------------------------
+
+### 3. Autoencoder Neural Network
+
+::: highlight-box
+**Prinsip:** Model dilatih **merekonstruksi data normal** — anomali
+menghasilkan *reconstruction error* tinggi karena pola tidak dipelajari.
+:::
+
+**Arsitektur (penelitian ini):**
+
+```         
+Input (16 neuron) → Encoder [64→32→8] → Bottleneck (8) → Decoder [8→32→64] → Output (16)
+```
+
+| Komponen          | Detail                                          |
+|-------------------|-------------------------------------------------|
+| Aktivasi hidden   | ReLU                                            |
+| Aktivasi output   | Linear                                          |
+| Optimizer         | Adam (lr = 0.001)                               |
+| Batch size        | 32                                              |
+| Epoch             | 100 (+ early stopping)                          |
+| Threshold anomali | Persentil ke-95 reconstruction error data latih |
+
+-   **Kelebihan:** Menangkap pola **non-linier kompleks** antar
+    indikator
+-   **Kelemahan:** Butuh tuning arsitektur; interpretabilitas rendah
+
+------------------------------------------------------------------------
+
+### 4. One-Class SVM (OCSVM)
+
+::: highlight-box
+**Prinsip:** Menemukan **hyperplane** dalam ruang kernel yang memisahkan
+data normal dari titik asal dengan margin maksimal.
+:::
+
+**Formula Optimasi:**
+$$\min_{\mathbf{w}, \rho, \xi} \frac{1}{2}\|\mathbf{w}\|^2 - \rho + \frac{1}{\nu n}\sum_i \xi_i$$
+
+**Fungsi Keputusan:**
+$$f(\mathbf{x}) = \text{sign}(\mathbf{w} \cdot \phi(\mathbf{x}) - \rho)$$ -
+$f(\mathbf{x}) = +1$ → **Normal**; $f(\mathbf{x}) = -1$ → **Anomali**
+
+**Kernel RBF:**
+$K(\mathbf{x}, \mathbf{y}) = \exp(-\gamma \|\mathbf{x} - \mathbf{y}\|^2)$
+
+| Parameter     | Keterangan                                        |
+|---------------|---------------------------------------------------|
+| $\nu$         | Trade-off antara fraction anomali & ukuran margin |
+| $\gamma$      | Lebar kernel RBF                                  |
+| Optimasi      | Grid search                                       |
+| Preprocessing | **StandardScaler wajib** (OCSVM sensitif skala)   |
+
+-   **Kelebihan:** Boundary keputusan kompleks; kontrol eksplisit
+    contamination via $\nu$
+-   **Kelemahan:** $O(n^2)$ hingga $O(n^3)$ — bottleneck data besar
+
+------------------------------------------------------------------------
+
+### 5. PCA-based Anomaly Detection
+
+::: highlight-box
+**Prinsip:** Data normal berada **dekat manifold linear** PC utama;
+anomali memiliki **reconstruction error (SPE) tinggi**.
+:::
+
+**Alur Kerja:**
+
+1.  Proyeksikan data ke **PC space** (eigenvector)
+2.  Rekonstruksi balik ke ruang asli menggunakan **k PC pertama** (≥95%
+    varians)
+3.  Hitung **SPE (Squared Prediction Error)** = ukuran anomali
+4.  **Hotelling's T²** untuk anomali dalam ruang PC tereduksi
+5.  Threshold: **UCL berbasis distribusi chi-squared**
+
+-   **Kelebihan:** Interpretabilitas tinggi; komponen = "indeks tekanan
+    komposit"; $O(n)$; cocok real-time EWS
+-   **Kelemahan:** Hanya menangkap pola **linear**
+
+> *Yousfani et al. (2025): PCA sebagai Financial Stress Index berhasil
+> mengidentifikasi GFC 2008, COVID-19, dan krisis Pakistan.*
+
+------------------------------------------------------------------------
+
+### 6. DBSCAN
+
+::: highlight-box
+**Prinsip:** Algoritma clustering berbasis kepadatan — titik yang tidak
+termasuk kluster mana pun (*noise*) dianggap **anomali**.
+:::
+
+**Tiga Kategori Titik:**
+
+| Kategori | Definisi |
+|------------------------------------|------------------------------------|
+| **Core Point** | Memiliki ≥ MinPts tetangga dalam radius $\varepsilon$ |
+| **Border Point** | Dalam radius $\varepsilon$ core point, tapi \< MinPts tetangga |
+| **Noise Point** | Tidak termasuk kluster mana pun → **ANOMALI (label = −1)** |
+
+**Parameter Implementasi:**
+
+| Parameter | Cara Penentuan |
+|------------------------------------|------------------------------------|
+| `eps` ($\varepsilon$) | K-distance plot → titik "elbow" |
+| `MinPts` | **15** (min ukuran kluster bermakna dalam data makroekonomi) |
+| Preprocessing | PCA (pertahankan 95% varians) + normalisasi |
+
+-   **Kelebihan:** Deteksi kluster bentuk arbitrari; tidak perlu jumlah
+    kluster; otomatis identifikasi noise
+-   **Kelemahan:** Sensitif $\varepsilon$; kurang efektif data
+    berdimensi sangat tinggi (*curse of dimensionality*)
+
+------------------------------------------------------------------------
+
+# BAB III — METODOLOGI
+
+## Data & Preprocessing
+
+### Variabel Penelitian
+
+| Jenis                 | Rincian                                        |
+|-----------------------|------------------------------------------------|
+| **Sumber**            | World Bank Global Economic Monitor API         |
+| **Unit analisis**     | Negara-tahun (country-year)                    |
+| **Jumlah negara**     | 49 negara                                      |
+| **Rentang waktu**     | 1990–2024                                      |
+| **Jumlah observasi**  | 1.715 (setelah preprocessing)                  |
+| **Jumlah variabel**   | 16 indikator makroekonomi                      |
+| **Variabel validasi** | `crisis_label` (dari katalog IMF & World Bank) |
+
+### Tahap Preprocessing
+
+```         
+Raw Data (API)
+     ↓
+1. Penanganan Missing Values:
+   - Forward Fill (data time series)
+   - Median Imputation (sisa NA)
+     ↓
+2. Deteksi Outlier Ekstrem
+     ↓
+3. Standardisasi Z-score (StandardScaler)
+     ↓
+4. Konstruksi variabel crisis_label
+     ↓
+Output: data_cleaned.csv + data_with_labels.csv
+```
+
+------------------------------------------------------------------------
+
+## Implementasi Setiap Algoritma
+
+### Ringkasan Implementasi
+
+| Algoritma | Parameter Utama | Preprocessing Khusus | Output Anomali |
+|------------------|------------------|------------------|------------------|
+| **Isolation Forest** | `contamination` (grid search) | StandardScaler | Anomaly score + label biner |
+| **LOF** | `n_neighbors` (grid search) | StandardScaler | LOF score + label biner |
+| **Autoencoder** | lr=0.001, batch=32, epoch=100 | StandardScaler | Reconstruction error |
+| **OCSVM** | `ν`, `γ` (grid search), kernel RBF | **Wajib** StandardScaler | Decision function score |
+| **PCA** | k PC (≥95% varians), UCL χ² | StandardScaler | SPE + T² statistic |
+| **DBSCAN** | `eps` (elbow), `MinPts=15` | PCA reduction + normalisasi | Noise label (−1) |
+
+------------------------------------------------------------------------
+
+## Alur Penelitian (8 Tahap)
+
+```         
+Tahap 1: Akuisisi & Verifikasi Data
+  → World Bank API + kompilasi crisis_label dari IMF/WB
+
+Tahap 2: Preprocessing Komprehensif
+  → Forward fill, median imputation, Z-score, crisis_label
+  → Output: data_cleaned.csv, data_with_labels.csv
+
+Tahap 3: Exploratory Data Analysis (EDA)
+  → Distribusi variabel, korelasi, pola temporal & lintas negara
+  → Perbedaan karakteristik periode normal vs. krisis
+
+Tahap 4: Kalibrasi Parameter
+  → Grid search: contamination (IF,LOF), nu+gamma (OCSVM),
+    arsitektur+lr (Autoencoder), k PC (PCA), eps+MinPts (DBSCAN)
+  → Sebagian data berlabel sebagai validation set
+
+Tahap 5: Penerapan 6 Algoritma
+  → Pipeline preprocessing seragam
+  → Output: anomaly score kontinu + label biner
+
+Tahap 6: Evaluasi & Seleksi Model
+  → Perbandingan metrik; ensemble model terbaik
+
+Tahap 7: Validasi Eksternal
+  → Bandingkan vs. katalog krisis historis IMF & World Bank
+
+Tahap 8: Interpretasi & Visualisasi
+  → Peta spasial & temporal anomali
+  → Identifikasi variabel kontributor utama
+  → Rekomendasi kebijakan
+```
+
+------------------------------------------------------------------------
+
+## Matriks Evaluasi
+
+### AUC-ROC *(Metrik Utama)*
+
+::: green-box
+**Mengapa AUC-ROC?** Dataset **imbalanced** (episode krisis jarang) →
+AUC-ROC lebih representatif dari akurasi biasa karena mengukur kemampuan
+diskriminatif pada **berbagai threshold** sekaligus.
+:::
+
+| Nilai AUC | Interpretasi             |
+|-----------|--------------------------|
+| 0.5       | Setara random classifier |
+| 0.7–0.8   | Performa cukup baik      |
+| 0.8–0.9   | Performa baik            |
+| \> 0.9    | Performa sangat baik     |
+
+### F1-Score & Average Precision *(Metrik Sekunder)*
+
+$$F1 = 2 \cdot \frac{\text{Precision} \times \text{Recall}}{\text{Precision} + \text{Recall}}$$
+
+-   **F1-Score:** Rata-rata harmonik Precision & Recall → sensitif
+    performa kelas minoritas
+-   **Average Precision (AP):** Luas area *Precision-Recall Curve* →
+    lebih informatif pada data imbalanced
+-   Dilaporkan pada **threshold optimal** = F1-Score terbaik di
+    validation set
+
+### Silhouette Index *(Khusus DBSCAN)*
+
+$$SI = \frac{b - a}{\max(a, b)}$$
+
+| Nilai SI        | Interpretasi                     |
+|-----------------|----------------------------------|
+| Mendekati **1** | Kualitas klaster baik            |
+| Mendekati **0** | Observasi di batas antar-klaster |
+| **Negatif**     | Penugasan klaster kurang tepat   |
+
+### Davies-Bouldin Index / DBI *(Khusus DBSCAN, komplementer SI)*
+
+$$DBI = \frac{1}{k}\sum_{i=1}^{k}\max_{j \neq i}\left(\frac{s_i + s_j}{d_{ij}}\right)$$
+
+-   $s_i$ = rata-rata jarak intra-klaster (scatter); $d_{ij}$ = jarak
+    antar-centroid klaster
+-   **Nilai DBI lebih rendah = struktur klaster lebih baik**
+
+------------------------------------------------------------------------
+
+## Target Penelitian
+
+1.  Teridentifikasinya **observasi anomali** dalam dataset (49 negara,
+    1990–2024, 14-dimensi) yang tervalidasi terhadap data krisis
+    historis
+2.  Diketahuinya **algoritma optimal** berdasarkan perbandingan AUC-ROC,
+    F1-Score, Precision, Recall, dan AP dari 6 algoritma
+3.  Tersusunnya **peta distribusi spasial & temporal** anomali
+    makroekonomi global sebagai basis analisis kebijakan EWS
+4.  Tersedianya **insight awal** pengembangan sistem EWS berbasis ML
+    yang dapat diimplementasikan secara praktis
+
+------------------------------------------------------------------------
+
+# RINGKASAN UTUH
+
+::: highlight-box
+## Gambaran Umum Penelitian
+
+Penelitian ini bertujuan membangun sistem **Early Warning System (EWS)**
+berbasis *unsupervised anomaly detection* untuk mendeteksi kerentanan
+makroekonomi pra-krisis pada **49 negara dalam periode 1990–2024**.
+Dataset berisi **1.715 observasi** dengan **16 indikator makroekonomi**
+bersumber dari World Bank Global Economic Monitor.
+:::
+
+### Masalah & Urgensi
+
+Krisis ekonomi global (Krisis Asia 1997, GFC 2008, COVID-19 2020)
+menunjukkan bahwa sistem deteksi konvensional berbasis statistik (logit,
+probit) gagal menangkap sinyal dini krisis karena keterbatasan asumsi
+linearitas dan ketergantungan pada label historis yang lengkap.
+Penelitian ini hadir sebagai solusi berbasis **machine learning
+unsupervised** yang tidak memerlukan label krisis dalam pelatihan model.
+
+### Pendekatan Metodologi
+
+Enam algoritma diuji secara komparatif pada pipeline preprocessing yang
+seragam:
+
+| \#  | Algoritma            | Pendekatan Inti                              |
+|-----|----------------------|----------------------------------------------|
+| 1   | **Isolation Forest** | Isolasi berbasis *path length* pendek        |
+| 2   | **LOF**              | Kepadatan lokal relatif terhadap tetangga    |
+| 3   | **Autoencoder**      | *Reconstruction error* tinggi = anomali      |
+| 4   | **OCSVM**            | Hyperplane pemisah dalam ruang kernel        |
+| 5   | **PCA-based**        | SPE tinggi = menyimpang dari manifold normal |
+| 6   | **DBSCAN**           | *Noise point* = tidak masuk kluster mana pun |
+
+### Preprocessing Pipeline
+
+Semua algoritma menggunakan pipeline yang sama: (**1**) *Forward fill* +
+*median imputation* untuk missing values → (**2**) deteksi outlier
+ekstrem → (**3**) standardisasi Z-score → (**4**) konstruksi
+`crisis_label` untuk validasi eksternal.
+
+### Evaluasi Model
+
+-   **Metrik utama:** AUC-ROC (mengukur diskriminasi pada semua
+    threshold)
+-   **Metrik sekunder:** F1-Score & Average Precision (untuk kelas
+    imbalanced)
+-   **Metrik clustering:** Silhouette Index + Davies-Bouldin Index
+    (khusus DBSCAN)
+-   **Validasi eksternal:** Hasil dibandingkan dengan katalog krisis
+    historis IMF & World Bank
+
+### Alur 8 Tahap
+
+Akuisisi Data → Preprocessing → EDA → Kalibrasi Parameter → Penerapan
+Algoritma → Evaluasi & Ensemble → Validasi Eksternal → Interpretasi &
+Visualisasi
+
+### Target Luaran
+
+1.  **Peta anomali** spasial & temporal 49 negara (1990–2024)
+2.  **Algoritma terbaik** untuk EWS makroekonomi multivariat
+3.  **Sistem EWS** berbasis ML yang praktis dan dapat direplikasi
+4.  **Evidensi empiris** efektivitas unsupervised anomaly detection
+    sebagai instrumen EWS
+
+### Posisi Penelitian
+
+::: warning-box
+Penelitian ini mengisi celah literatur berupa: (a) tidak adanya kajian
+komparatif sistematis 6 algoritma unsupervised pada data makroekonomi
+multivariat lintas negara-waktu, dan (b) ketiadaan peta distribusi
+anomali global yang tervalidasi sebagai basis analisis kebijakan EWS
+berbasis data.
+:::
+
+------------------------------------------------------------------------
+
+*Cheatsheet ini dibuat untuk keperluan UTS — 3SI1 Kelompok 4 \| Data
+Mining Semester 6*
