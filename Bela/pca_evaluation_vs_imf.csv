@@ -1,0 +1,2 @@
+Metode,True Positive (TP),False Positive (FP),True Negative (TN),False Negative (FN),Precision,Recall,F1-Score,ROC-AUC,Average Precision
+PCA (Murni Unsupervised),46,185,1301,183,0.1991,0.2009,0.2,0.6031,0.1894
